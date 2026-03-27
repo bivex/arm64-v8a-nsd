@@ -104,6 +104,13 @@ class BranchAnalyzer:
     # Map building
     # ------------------------------------------------------------------
 
+    def _label_at(self, line_index: int) -> str | None:
+        """Return the label name at *line_index*, if any."""
+        for label_name, label_index in self._label_map.items():
+            if label_index == line_index:
+                return label_name
+        return None
+
     def _build_label_map(self) -> dict[str, int]:
         label_map: dict[str, int] = {}
         for index, line in enumerate(self._lines):
@@ -226,39 +233,65 @@ class BranchAnalyzer:
         return patterns
 
     def detect_while_loops(self) -> list[WhileLoopPattern]:
-        """Detect while loops from backward conditional branches."""
+        """Detect while loops from backward branches.
+
+        Two patterns are recognised:
+        1. Backward conditional branch (condition at bottom).
+        2. Backward unconditional branch where the target has a forward
+           conditional exit (condition at top).
+        """
         patterns: list[WhileLoopPattern] = []
         used_branches: set[int] = set()
 
         for branch in self._branches:
             if branch.line_index in used_branches:
                 continue
-            if not branch.is_conditional or branch.is_forward is not False:
-                continue
-            if branch.target_line_index is None:
+            if branch.is_forward is not False or branch.target_line_index is None:
                 continue
 
-            cond = branch_condition(branch.mnemonic) or "true"
+            # --- Pattern 1: backward conditional ---
+            if branch.is_conditional:
+                cond = branch_condition(branch.mnemonic) or "true"
+                header_label = self._label_at(branch.target_line_index)
+                patterns.append(WhileLoopPattern(
+                    header_label=header_label,
+                    header_line=branch.target_line_index,
+                    body_start=branch.target_line_index,
+                    body_end=branch.line_index - 1,
+                    condition_line=branch.line_index,
+                    branch_line=branch.line_index,
+                    condition=cond,
+                ))
+                used_branches.add(branch.line_index)
+                continue
 
-            # Check if there's a label at the target (loop header)
-            header_label = None
-            for label_name, label_index in self._label_map.items():
-                if label_index == branch.target_line_index:
-                    header_label = label_name
-                    break
-
-            # Look for a preceding unconditional branch that jumps over the loop
-            # (the loop guard: b cond_skip / loop_header: ... b.cond loop_header / skip:)
-            patterns.append(WhileLoopPattern(
-                header_label=header_label,
-                header_line=branch.target_line_index,
-                body_start=branch.target_line_index,
-                body_end=branch.line_index - 1,
-                condition_line=branch.line_index,
-                branch_line=branch.line_index,
-                condition=cond,
-            ))
-            used_branches.add(branch.line_index)
+            # --- Pattern 2: backward unconditional with forward conditional exit ---
+            if is_unconditional_branch(branch.mnemonic):
+                header_idx = branch.target_line_index
+                # Scan from header for a forward conditional branch (the loop exit)
+                for other in self._branches:
+                    if (
+                        other.is_conditional
+                        and other.is_forward is True
+                        and other.line_index > header_idx
+                        and other.line_index < branch.line_index
+                        and other.line_index not in used_branches
+                    ):
+                        # The exit condition is on the cmp just before the branch
+                        cond = branch_condition(other.mnemonic) or "true"
+                        header_label = self._label_at(header_idx)
+                        patterns.append(WhileLoopPattern(
+                            header_label=header_label,
+                            header_line=header_idx,
+                            body_start=header_idx,
+                            body_end=branch.line_index - 1,
+                            condition_line=other.line_index,
+                            branch_line=branch.line_index,
+                            condition=cond,
+                        ))
+                        used_branches.add(branch.line_index)
+                        used_branches.add(other.line_index)
+                        break
 
         return patterns
 
@@ -524,7 +557,7 @@ class BranchAnalyzer:
         switch_patterns: list[SwitchPattern],
     ) -> WhileFlowStep:
         body_steps = self._build_steps(
-            start=pat.body_start,
+            start=pat.header_line + 1,  # skip the header label to avoid re-detecting this pattern
             end=pat.body_end + 1,
             covered=covered,
             if_patterns=if_patterns,
