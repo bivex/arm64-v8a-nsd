@@ -126,7 +126,7 @@ class BranchAnalyzer:
             mnem = line.mnemonic.lower()
 
             if is_conditional_branch(mnem) or is_unconditional_branch(mnem):
-                target_label = self._extract_branch_target(line.operands)
+                target_label = self._extract_branch_target(mnem, line.operands)
                 if target_label is None:
                     continue
 
@@ -146,20 +146,29 @@ class BranchAnalyzer:
         return tuple(branches)
 
     @staticmethod
-    def _extract_branch_target(operands: str) -> str | None:
-        """Extract the label target from branch operands."""
+    def _extract_branch_target(mnemonic: str, operands: str) -> str | None:
+        """Extract the label target from branch operands.
+
+        For b/b.cond/bl/br/blr the target is the first operand.
+        For cbz/cbnz the target is the second operand  (reg, label).
+        For tbz/tbnz the target is the third operand   (reg, #bit, label).
+        """
+        mnem = mnemonic.lower()
         stripped = operands.strip()
         if not stripped:
             return None
-        # First token before any comma/space is the target label
-        for sep in (",", " ", "\t"):
-            if sep in stripped:
-                stripped = stripped[:stripped.index(sep)].strip()
-                break
-        # Clean any remaining whitespace
-        stripped = stripped.strip()
-        if stripped and stripped[0].isalpha() or stripped[0] in ("_", "."):
-            return stripped
+
+        parts = [p.strip() for p in stripped.replace("\t", " ").split(",")]
+
+        if mnem in ("cbz", "cbnz") and len(parts) >= 2:
+            candidate = parts[1].strip()
+        elif mnem in ("tbz", "tbnz") and len(parts) >= 3:
+            candidate = parts[2].strip()
+        else:
+            candidate = parts[0].strip()
+
+        if candidate and (candidate[0].isalpha() or candidate[0] in ("_", ".")):
+            return candidate
         return None
 
     # ------------------------------------------------------------------
@@ -356,7 +365,7 @@ class BranchAnalyzer:
 
                 mnem = scan_line.mnemonic.lower()
                 if is_conditional_branch(mnem):
-                    target = self._extract_branch_target(scan_line.operands)
+                    target = self._extract_branch_target(mnem, scan_line.operands)
                     if target and is_conditional_branch(mnem):
                         cond = branch_condition(mnem) or "eq"
                         case_labels.append((cond, target))
@@ -368,7 +377,7 @@ class BranchAnalyzer:
                     continue
                 elif is_unconditional_branch(mnem):
                     # Default case jump
-                    target = self._extract_branch_target(scan_line.operands)
+                    target = self._extract_branch_target(mnem, scan_line.operands)
                     if target:
                         case_labels.append(("default", target))
                     scan_index += 1
