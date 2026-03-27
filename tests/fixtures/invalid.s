@@ -1,0 +1,2 @@
+    .text
+    BROKEN INSTRUCTION @@@
