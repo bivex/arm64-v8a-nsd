@@ -1,5 +1,26 @@
 # TODO - Issues found from HelloSilicon testing
 
+## ✅ Completed
+
+### 1. `_start:` label not recognized as function ✅ FIXED
+- **Fix:** Added `svc` as function terminator in `_find_function_end()`
+
+### 2. Darwin/macOS system call patterns ✅ FIXED
+- **Fix:** Added `SystemCallStep` domain type with pink/red styling
+
+### 3. ARM64 macro support ✅ FIXED
+- **Added:** `MacroExpander` class in `macro_expander.py`
+- **Features:**
+  - `.macro name param1, param2, ...` / `.endm` definitions
+  - `.include "filename"` directive processing
+  - Parameter substitution with `\paramname`
+  - Inline macro expansion
+- **Integration:** Wired into `Arm64AsmControlFlowExtractor` before tokenization
+
+## Priority Issues
+
+(All resolved)
+
 ## Priority Issues
 
 ### 1. `_start:` label not recognized as function ✅ FIXED

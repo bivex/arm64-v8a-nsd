@@ -146,16 +146,42 @@ class Arm64AsmControlFlowExtractor(Arm64ControlFlowExtractor):
 
     @staticmethod
     def _find_function_end(lines: tuple[Arm64Line, ...], start: int) -> int | None:
-        """Find the ret/svc instruction that ends a function."""
+        """Find the ret/svc instruction that ends a function.
+
+        For Darwin/macOS programs, treats svc #0x80 as a potential terminator
+        when followed by .data section or end of file.
+        """
         depth = 0
         for index in range(start, len(lines)):
             line = lines[index]
             if line.mnemonic is None:
                 continue
             mnem = line.mnemonic.lower()
-            # ret or svc (Darwin system call) terminates function
-            if (is_return(mnem) or mnem == "svc") and depth == 0:
+            if is_return(mnem) and depth == 0:
                 return index
+            # For Darwin: svc might terminate if followed by .data or EOF
+            if mnem == "svc" and depth == 0:
+                # Check if this is followed by .data or end of file
+                next_idx = index + 1
+                while next_idx < len(lines):
+                    next_line = lines[next_idx]
+                    # Skip empty lines and comments
+                    if next_line.is_empty or (next_line.comment and not next_line.directive and not next_line.mnemonic):
+                        next_idx += 1
+                        continue
+                    # If followed by .data section, this svc terminates
+                    if next_line.directive and next_line.directive.lower() == ".data":
+                        return index
+                    # If followed by another instruction, not a terminator
+                    if next_line.is_instruction:
+                        break
+                    # If followed by another directive, stop looking
+                    if next_line.directive:
+                        break
+                    next_idx += 1
+                # If we reached end of file, this svc terminates
+                if next_idx >= len(lines):
+                    return index
             # Handle nested bl/ret patterns — bl doesn't increase depth
             # because ARM64 doesn't have nested function definitions
         return None
