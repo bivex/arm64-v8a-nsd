@@ -1,92 +1,52 @@
-# Swifta
+# arm64-v8a-nsd
 
-Swifta is a simple, scalable monolith for parsing Swift source code through ANTLR while keeping the architecture clean enough for future semantic analysis, indexing, and export pipelines.
+ARM64/AArch64 assembly to Nassi-Shneiderman diagram converter. Parses GAS/Clang-syntax ARM64 assembly, extracts structured control flow, and renders interactive HTML diagrams with inline SVG. Zero runtime dependencies.
 
-The project starts from the domain, not from the framework:
+## What it does
 
-* business goal: convert Swift source into a stable structural model for downstream tooling
-* architectural style: DDD-inspired layered monolith with hexagonal boundaries
-* parser engine: ANTLR4 with the public Swift 5 grammar from `antlr/grammars-v4`, plus a reproducible Python-compatibility patch step
-* current delivery channel: CLI that parses a file or a directory and returns versioned JSON
-
-## What the system does
-
-Today the system supports:
-
-* **Parsing Swift code**
-  * parsing one Swift file
-  * parsing a directory of Swift files
-  * extracting a lightweight structural model: imports, type declarations, functions, variables, and extensions
-  * reporting syntax diagnostics as part of the contract
-
-* **Control flow extraction**
-  * if/else statements with nested branches
-  * guard statements
-  * while loops
-  * for-in loops
-  * repeat-while loops
-  * switch/case statements
-  * do-catch blocks
-  * defer blocks
-  * trailing closure expansion (`.map{}`, `.forEach{}`, `.reduce{}`)
-
-* **Nassi-Shneiderman diagrams**
-  * building a Nassi-Shneiderman HTML diagram for one Swift file
-  * building diagram bundles for entire directories with index page
-  * classic NS rendering with SVG triangles for if-blocks
-  * depth-coded nested ifs (up to 50 levels with color cycling and Unicode badges ①-㊿)
-  * classic case block structure with side-by-side columns
+* **ARM64 assembly parsing** — tokenizes GAS/Clang `.s` files, identifies labels, instructions, and comments
+* **Control flow extraction** — reconstructs structured patterns from raw branch patterns:
+  * if / if-else / guard
+  * while loops (pre-condition)
+  * repeat-while loops (post-condition)
+  * infinite loops
+  * switch / case (jump tables)
+  * function calls (bl/blr), tail calls, early returns
+  * break / continue inside loops
+  * conditional select (csel/cset)
+  * indirect branches (br xN)
+* **Nassi-Shneiderman diagrams** — renders HTML with inline SVG:
+  * classic NS triangles for if-blocks with Yes/No labels
+  * horizontal dividers for case blocks with side-by-side columns
+  * color-coded block types (loops=blue, calls=orange, returns=grey, etc.)
+  * depth-coded nested ifs (up to 50 levels with color cycling and Unicode badges)
   * dark Tokyo Night-inspired theme with JetBrains Mono font
-  * proper text wrapping and responsive layout
+  * responsive layout
 
-* **Architecture**
-  * keeping parser infrastructure behind ports so the application layer stays independent from ANTLR, filesystem, and CLI details
+* **Feature tour** — self-contained HTML showcase with 13 embedded ARM64 examples covering every supported pattern
 
-## Diagram Features
+## Screenshots
 
-The Nassi-Shneiderman diagrams include:
-
-* **Visual clarity**
-  * Classic NS triangles for if-blocks with Yes/No labels
-  * Horizontal dividers for case blocks with side-by-side columns
-  * Color-coded block types (loops=blue, guards=orange, switches=teal, etc.)
-  * JetBrains Mono monospace font for code readability
-
-* **Depth awareness**
-  * 50 depth levels with cycling colors (blue → green → purple → teal → amber)
-  * Unicode circled badges (①-⑩, ⑪-⑳, ㉑-㉟, ㊱-㊿) on nested conditionals
-  * Background tinting for deeper nesting levels
-
-* **Dark theme**
-  * Tokyo Night-inspired color palette optimized for code readability
-  * Proper contrast ratios for comfortable viewing
-  - Responsive layout for different screen sizes
-
-* **Smart parsing**
-  * Trailing closure expansion for functional chains
-  * Autoreleasepool unwrapping for Objective-C interop
-  * Fast path for simple function bodies
-
-### Screenshots
-
-**Basic control flow** — loops, guards, and switch/case blocks:
+**Control flow diagram** — if/else, while loop, repeat-while, switch/case in the `_score` function:
 
 ![Basic NS diagram](docs/screenshots/nassi_diagram.png)
 
-**Nested conditionals** — depth-coded badges and colors for up to 50 nesting levels:
+**Nested patterns** — nested if + while with depth-coded badges and color cycling:
 
 ![Nested depth diagram](docs/screenshots/nested_depth.png)
 
+**Feature tour** — interactive two-column layout with source code and NSD diagrams for all 13 patterns:
+
+![Tour overview](docs/screenshots/tour_overview.png)
+
 ## Architecture
 
-The codebase is split into four explicit layers:
+DDD-inspired hexagonal architecture with four explicit layers:
 
-* `domain`: domain model, invariants, ports, and domain events
-* `application`: use cases and DTOs
-* `infrastructure`: ANTLR adapter, filesystem adapters, event publishing
-* `presentation`: CLI contract
-
-See the full design docs in [docs/domain-and-goals.md](/Volumes/External/Code/Swifta/docs/domain-and-goals.md), [docs/requirements.md](/Volumes/External/Code/Swifta/docs/requirements.md), [docs/system-context.md](/Volumes/External/Code/Swifta/docs/system-context.md), [docs/glossary.md](/Volumes/External/Code/Swifta/docs/glossary.md), and [docs/architecture.md](/Volumes/External/Code/Swifta/docs/architecture.md).
+* `domain` — control flow model, step types, ports
+* `application` — use cases and DTOs
+* `infrastructure` — ARM64 tokenizer, branch analyzer, control flow extractor, HTML renderer, tour generator
+* `presentation` — CLI contract
 
 ## Quick Start
 
@@ -96,48 +56,43 @@ See the full design docs in [docs/domain-and-goals.md](/Volumes/External/Code/Sw
 uv sync --extra dev
 ```
 
-2. Generate the Swift parser from the vendored grammar:
+2. Generate a Nassi-Shneiderman diagram for an ARM64 assembly file:
 
 ```bash
-uv run python scripts/generate_swift_parser.py
+uv run arm64nsd nassi-file path/to/code.s --out output/diagram.html
 ```
 
-3. Parse a single file:
+3. Generate diagrams for all `.s` files in a directory:
 
 ```bash
-uv run swifta parse-file path/to/File.swift
+uv run arm64nsd nassi-dir path/to/project --out output/bundle
 ```
 
-4. Parse a directory:
+4. Generate the feature tour with all 13 ARM64 control flow patterns:
 
 ```bash
-uv run swifta parse-dir path/to/project
+uv run arm64nsd tour --out tour.html
 ```
 
-5. Build a Nassi-Shneiderman diagram for a Swift file:
+## Supported ARM64 Branch Patterns
 
-```bash
-uv run swifta nassi-file path/to/Algorithms.swift --out output/algorithms.nassi.html
-```
+| Pattern | Detection |
+|---------|-----------|
+| `b.cond target` (forward) | if / if-else |
+| `cbz/cbnz target` (forward) | if (register == 0 / != 0) |
+| `tbz/tbnz target` (forward) | if (register[bit] == 0 / != 0) |
+| `b target` (backward) + forward conditional exit | while loop |
+| `b.cond target` (backward) | repeat-while loop |
+| `b target` (backward, no exit) | infinite loop |
+| Multiple `b.eq/b.ne/b.lt...` to case labels | switch/case |
+| `bl/blr target` | function call |
+| `b external_label` (not in label map) | tail call |
+| `ret` inside function body | early return |
+| `b loop_header` inside loop body | continue |
+| `b loop_exit` inside loop body | break |
+| `csel/cset/csinc/csinv/csneg` | conditional select (inline if) |
+| `br xN` | indirect branch |
 
-6. Build Nassi-Shneiderman diagrams for an entire directory:
+## Constraints
 
-```bash
-uv run swifta nassi-dir path/to/project --out output/nassi-bundle
-```
-
-## Constraints and honesty
-
-The current ANTLR grammar is sourced from `antlr/grammars-v4/swift/swift5`. Its own README states that it targets Swift 5.4 syntax, is not fully aligned with the Swift compiler, and has known ambiguities. The upstream grammar also needs a compatibility patch step for Python target generation because the original grammar ships with Java-oriented support code and embedded actions. Swifta makes those limitations explicit in requirements, ADRs, and runtime metadata so downstream consumers know what contract they are integrating with.
-
-## Next Steps
-
-Useful future extensions:
-
-* richer control flow visualization (async/await, actors, SwiftUI)
-* symbol graph export
-* semantic passes on top of the structural model
-* integration adapters for external analysis tools
-* incremental parsing and caching
-* interactive HTML diagrams with collapsible nodes
-* export to other diagram formats (SVG, PNG, Mermaid)
+The branch analyzer reconstructs structured control flow from unstructured assembly. It handles the common ARM64 patterns listed above but does not guarantee full coverage of arbitrary branch graphs (e.g., irreducible control flow, computed jump tables with data-driven indexing).
