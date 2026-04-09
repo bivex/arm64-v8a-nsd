@@ -124,14 +124,15 @@ class Arm64AsmControlFlowExtractor(Arm64ControlFlowExtractor):
 
     @staticmethod
     def _find_function_end(lines: tuple[Arm64Line, ...], start: int) -> int | None:
-        """Find the ret instruction that ends a function."""
+        """Find the ret/svc instruction that ends a function."""
         depth = 0
         for index in range(start, len(lines)):
             line = lines[index]
             if line.mnemonic is None:
                 continue
             mnem = line.mnemonic.lower()
-            if is_return(mnem) and depth == 0:
+            # ret or svc (Darwin system call) terminates function
+            if (is_return(mnem) or mnem == "svc") and depth == 0:
                 return index
             # Handle nested bl/ret patterns — bl doesn't increase depth
             # because ARM64 doesn't have nested function definitions

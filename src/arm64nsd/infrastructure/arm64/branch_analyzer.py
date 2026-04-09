@@ -20,6 +20,7 @@ from arm64nsd.domain.control_flow import (
     ReturnStep,
     SwitchCaseFlow,
     SwitchFlowStep,
+    SystemCallStep,
     TailCallStep,
     WhileFlowStep,
 )
@@ -753,11 +754,15 @@ class BranchAnalyzer:
                     index = branch + 1
                     continue
 
-            # Uncovered line → CallFlowStep, TailCallStep, ReturnStep, or ActionFlowStep
+            # Uncovered line → CallFlowStep, TailCallStep, ReturnStep, SystemCallStep, or ActionFlowStep
             if line.is_instruction:
                 mnem = (line.mnemonic or "").lower()
                 if is_return(mnem):
                     steps.append(ReturnStep())
+                elif mnem == "svc":
+                    # Extract the system call number from operands
+                    operands = line.operands.strip() if line.operands else ""
+                    steps.append(SystemCallStep(number=operands))
                 elif mnem in ("bl", "blr"):
                     target = line.operands.strip().split(",")[0].strip() or mnem
                     steps.append(CallFlowStep(target=target))

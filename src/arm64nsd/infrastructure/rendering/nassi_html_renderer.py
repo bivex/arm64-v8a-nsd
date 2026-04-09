@@ -23,6 +23,7 @@ from arm64nsd.domain.control_flow import (
     ReturnStep,
     SwitchCaseFlow,
     SwitchFlowStep,
+    SystemCallStep,
     TailCallStep,
     WhileFlowStep,
 )
@@ -369,6 +370,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-node.ns-indirect {{ border-left: 3px solid var(--teal); background: var(--teal-dim); }}
       .ns-node.ns-prologue {{ border-left: 3px solid var(--green); background: var(--green-dim); }}
       .ns-node.ns-epilogue {{ border-left: 3px solid var(--red); background: var(--red-dim); }}
+      .ns-node.ns-syscall {{ border-left: 3px solid #f7768e; background: rgba(247, 118, 142, 0.12); }}
       .stack-text {{
         display: block;
         font-family: var(--mono);
@@ -423,6 +425,29 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         color: var(--muted);
         font-style: italic;
         letter-spacing: -0.01em;
+      }}
+      .syscall-text {{
+        display: block;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.72;
+        color: #f7768e;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+      }}
+      .syscall-badge {{
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 7px;
+        border-radius: 3px;
+        margin-bottom: 4px;
+        background: rgba(247, 118, 142, 0.15);
+        color: #f7768e;
+        border: 1px solid rgba(247, 118, 142, 0.3);
       }}
       .inline-if-text {{
         display: block;
@@ -759,6 +784,16 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 '<div class="ns-node ns-return">'
                 '<div class="ns-label" aria-label="Return">'
                 '<code class="return-text">ret</code>'
+                "</div>"
+                "</div>"
+            )
+        if isinstance(step, SystemCallStep):
+            number_html = self._highlight_registers(escape(step.number))
+            return (
+                '<div class="ns-node ns-syscall">'
+                '<div class="ns-label">'
+                '<span class="syscall-badge">syscall</span>'
+                f'<code class="syscall-text"><br/>svc {number_html}</code>'
                 "</div>"
                 "</div>"
             )

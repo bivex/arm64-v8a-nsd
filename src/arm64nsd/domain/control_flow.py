@@ -43,6 +43,12 @@ class ReturnStep(ControlFlowStep):
 
 
 @dataclass(frozen=True, slots=True)
+class SystemCallStep(ControlFlowStep):
+    """System call: svc #N (Darwin/kernel)."""
+    number: str
+
+
+@dataclass(frozen=True, slots=True)
 class PrologueStep(ControlFlowStep):
     """Function prologue: stack frame setup (stp fp/lr, sub sp, mov fp)."""
     instructions: tuple[str, ...]
