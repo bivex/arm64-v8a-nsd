@@ -786,7 +786,7 @@ class BranchAnalyzer:
                     scan = index + 1
                     while scan < end and scan < len(self._lines):
                         nxt = self._lines[scan]
-                        if not nxt.is_instruction or scan in covered:
+                        if not nxt.is_instruction:
                             break
                         nxt_mnem = (nxt.mnemonic or "").lower()
                         if is_prologue_instruction(nxt_mnem, nxt.operands or ""):
@@ -803,7 +803,7 @@ class BranchAnalyzer:
                     scan = index + 1
                     while scan < end and scan < len(self._lines):
                         nxt = self._lines[scan]
-                        if not nxt.is_instruction or scan in covered:
+                        if not nxt.is_instruction:
                             break
                         nxt_mnem = (nxt.mnemonic or "").lower()
                         if is_epilogue_instruction(nxt_mnem, nxt.operands or ""):
