@@ -15,6 +15,7 @@ from arm64nsd.application.control_flow import (
     NassiDiagramBundleDTO,
     NassiDiagramService,
 )
+from arm64nsd.infrastructure.rendering.tour_generator import TourGenerator
 from arm64nsd.application.dto import ParseDirectoryCommand, ParseFileCommand, ParsingJobReportDTO
 from arm64nsd.application.use_cases import ParsingJobService
 from arm64nsd.domain.errors import Arm64NsdError
@@ -80,6 +81,14 @@ def main(argv: list[str] | None = None) -> int:
             ]
             print(json.dumps(payload, indent=2))
             return 0
+        elif args.command == "tour":
+            generator = _build_tour_generator()
+            html = generator.generate()
+            output_path = Path(args.out).expanduser().resolve() if args.out else Path("arm64nsd-tour.html")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(html, encoding="utf-8")
+            print(json.dumps({"output_path": str(output_path)}, indent=2))
+            return 0
         else:
             parser.error(f"unsupported command: {args.command}")
     except Arm64NsdError as error:
@@ -120,6 +129,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         "--out",
         help="Output directory. Defaults to <input>.nassi/.",
     )
+
+    tour = subparsers.add_parser(
+        "tour",
+        help="Generate an interactive feature tour with NSD diagrams for all ARM64 control flow patterns.",
+    )
+    tour.add_argument(
+        "--out",
+        help="Output HTML path. Defaults to arm64nsd-tour.html.",
+    )
     return parser
 
 
@@ -136,6 +154,13 @@ def _build_parse_service() -> ParsingJobService:
 def _build_nassi_service() -> NassiDiagramService:
     return NassiDiagramService(
         source_repository=FileSystemSourceRepository(),
+        extractor=Arm64AsmControlFlowExtractor(),
+        renderer=HtmlNassiDiagramRenderer(),
+    )
+
+
+def _build_tour_generator() -> TourGenerator:
+    return TourGenerator(
         extractor=Arm64AsmControlFlowExtractor(),
         renderer=HtmlNassiDiagramRenderer(),
     )
