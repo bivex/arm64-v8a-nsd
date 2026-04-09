@@ -342,11 +342,10 @@ _STACK_FRAME_REGISTERS: frozenset[str] = frozenset({"fp", "lr", "x29", "x30"})
 
 
 def is_prologue_instruction(mnemonic: str, operands: str) -> bool:
-    """True when the instruction is a typical function prologue operation.
+    """True when the instruction is a stack frame setup operation.
 
     Recognised patterns:
-      - stp x29, x30, [sp, #... ]!   (push frame record)
-      - stp fp, lr, [sp, #...]!
+      - stp any, any, [sp, #... ]!   (push to stack)
       - sub sp, sp, #N               (allocate stack frame)
       - mov x29, sp                  (set frame pointer)
       - mov fp, sp
@@ -355,11 +354,10 @@ def is_prologue_instruction(mnemonic: str, operands: str) -> bool:
     mnem = mnemonic.lower()
     ops = operands.lower().replace(" ", "")
 
-    # stp with fp/lr/x29/x30 targeting [sp, ...]!
+    # stp with sp targeting [sp, ...]!
     if mnem == "stp":
-        has_frame_reg = any(r in ops for r in _STACK_FRAME_REGISTERS)
         has_sp = "sp" in ops and ("[sp" in ops or ",sp" in ops)
-        return has_frame_reg and has_sp
+        return has_sp
 
     # sub sp, sp, #N or sub sp, sp, N
     if mnem == "sub":
