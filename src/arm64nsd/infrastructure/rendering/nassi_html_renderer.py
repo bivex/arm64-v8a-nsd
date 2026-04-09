@@ -34,13 +34,15 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     # Register patterns for syntax highlighting
     _REG_PATTERNS = {
         # Argument/return registers (x0-x7, w0-w7, v0-v7, d0-d7, s0-s7)
-        "arg": re.compile(r'\b([xwvds][0-7])(?!\d)'),
+        "arg": re.compile(r"\b([xwvds][0-7])(?!\d)"),
         # Callee-saved registers (x19-x28, w19-w28)
-        "callee": re.compile(r'\b([xw][12][0-9]|[xw]2[0-8])(?!\d)'),
+        "callee": re.compile(r"\b([xw][12][0-9]|[xw]2[0-8])(?!\d)"),
         # Special registers (sp, fp, lr, x29, x30, xzr, wzr)
-        "special": re.compile(r'\b(sp|wsp|fp|xfp|lr|xlr|zr|xzr|wzr|x29|w29|x30|w30)\b', re.IGNORECASE),
+        "special": re.compile(
+            r"\b(sp|wsp|fp|xfp|lr|xlr|zr|xzr|wzr|x29|w29|x30|w30)\b", re.IGNORECASE
+        ),
         # FP/SIMD registers (v8-v31, d8-d31, s8-s31, q0-q31, h0-h31, b0-b31)
-        "fp": re.compile(r'\b([vdsqhb][89]|[1-3][0-9]|[vdsqhb][12][0-9]|[vdsqhb]3[01])(?!\d)'),
+        "fp": re.compile(r"\b([vdsqhb][89]|[1-3][0-9]|[vdsqhb][12][0-9]|[vdsqhb]3[01])(?!\d)"),
         # Temporaries (x8-x18, w8-w18) - will be default color
     }
 
@@ -78,8 +80,10 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
         result = text
         for pattern, css_class in replacements:
+
             def replacer(m):
                 return f'<span class="{css_class}">{m.group(0)}</span>'
+
             result = pattern.sub(replacer, result)
 
         return result
@@ -98,7 +102,9 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         rules = []
         for i in range(51):
             c = colors[i % 5]
-            rules.append(f"      .ns-if-depth-{i}-triangle {{ fill: var(--{c}-dim); stroke: var(--{c}); }}")
+            rules.append(
+                f"      .ns-if-depth-{i}-triangle {{ fill: var(--{c}-dim); stroke: var(--{c}); }}"
+            )
             rules.append(f"      .ns-if-depth-{i}-diagonal {{ stroke: var(--{c}); }}")
         return "\n".join(rules)
 
@@ -127,34 +133,34 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         --border:      #2b3b59;
         --border-strong: #3f5378;
         --border-soft: #182338;
-        --text:        #cfd8f6;
-        --text-bright: #f4f7ff;
-        --muted:       #8e9bbb;
+        --text:        #e6edf3;
+        --text-bright: #ffffff;
+--muted: #94a3b8;
         --shadow:      0 24px 72px rgba(3, 8, 18, 0.56);
 
         /* Accent colours */
-        --blue:        #82aaff;
-        --blue-dim:    #243b69;
-        --green:       #a6da95;
-        --green-dim:   #163628;
-        --red:         #ff93a9;
-        --red-dim:     #371925;
-        --orange:      #ffb86b;
-        --orange-dim:  #37230f;
-        --teal:        #56d4dd;
-        --teal-dim:    #11343b;
-        --purple:      #c4a7ff;
-        --purple-dim:  #2a1d41;
-        --amber:       #f1ca7a;
-        --amber-dim:   #39290f;
+--blue: #60a5fa;
+--blue-dim: #1e4a8a;
+--green: #65f0b1;
+--green-dim: #116650;
+--red: #f472b6;
+--red-dim: #912d6c;
+--orange: #fb923c;
+--orange-dim: #92400e;
+--teal: #2dd4bf;
+--teal-dim: #0f766e;
+--purple: #c084fc;
+--purple-dim: #6e1a9d;
+--amber: #fbbf24;
+--amber-dim: #a16207;
 
-        /* Block fills */
-        --loop-fill:   #132033;
-        --switch-fill: #102529;
-        --yes-fill:    #102217;
-        --no-fill:     #251019;
-        --action-fill: var(--surface-2);
-        --note-fill:   #101720;
+/* Block fills */
+         --loop-fill:   #1a2337;
+         --switch-fill: #182a33;
+         --yes-fill:    #1b2a21;
+         --no-fill:     #2a1925;
+         --action-fill: var(--surface-2);
+         --note-fill:   #15202b;
 
         /* Code font */
         --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "SF Mono", "Menlo", monospace;
@@ -780,7 +786,11 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             mnemonic = parts[0] if parts else step.expression
             cond = parts[1] if len(parts) > 1 else ""
             mnemonic_html = self._highlight_registers(self._escape_instruction(mnemonic))
-            cond_html = f' <span class="inline-if-cond">{self._highlight_registers(self._escape_instruction(cond))}</span>' if cond else ''
+            cond_html = (
+                f' <span class="inline-if-cond">{self._highlight_registers(self._escape_instruction(cond))}</span>'
+                if cond
+                else ""
+            )
             return (
                 '<div class="ns-node ns-inline-if">'
                 '<div class="ns-label">'
@@ -818,9 +828,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             )
         if isinstance(step, InfiniteLoopStep):
             return (
-                '<div class="ns-node ns-infinite">'
-                '<div class="ns-header">Infinite Loop</div>'
-                "</div>"
+                '<div class="ns-node ns-infinite"><div class="ns-header">Infinite Loop</div></div>'
             )
         if isinstance(step, BreakStep):
             return (
@@ -962,14 +970,14 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             f'<foreignObject x="20" y="6" width="{content_width}" height="{text_height}" '
             'class="ns-if-condition-fo">'
             f'<div xmlns="http://www.w3.org/1999/xhtml" class="ns-if-condition-text">{badge} {escaped}</div>'
-            '</foreignObject>'
+            "</foreignObject>"
             f'<line x1="0" y1="{split_y}" x2="{half_width}" y2="{svg_height}" '
             f'class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
             f'<line x1="{svg_width}" y1="{split_y}" x2="{half_width}" y2="{svg_height}" '
             f'class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
             f'<text x="{yes_x}" y="{label_y}" text-anchor="middle" class="ns-if-label-yes">Yes</text>'
             f'<text x="{no_x}" y="{label_y}" text-anchor="middle" class="ns-if-label-no">No</text>'
-            '</svg>'
+            "</svg>"
             "</div>"
         )
 
