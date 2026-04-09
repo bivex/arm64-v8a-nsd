@@ -164,16 +164,17 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
         /* Code font */
         --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "SF Mono", "Menlo", monospace;
-        --ui:   "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+        --ui: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
       }}
       * {{ box-sizing: border-box; margin: 0; padding: 0; }}
       body {{
         font-family: var(--ui);
         font-size: 14px;
         color: var(--text);
-        background:
-          radial-gradient(circle at top, rgba(130, 170, 255, 0.12), transparent 28%),
-          linear-gradient(180deg, var(--bg) 0%, #0c121d 100%);
+background:
+           radial-gradient(circle at top right, rgba(96, 165, 250, 0.08), transparent 40%),
+           radial-gradient(circle at bottom left, rgba(244, 117, 182, 0.08), transparent 40%),
+           linear-gradient(180deg, var(--bg) 0%, #0b1219 100%);
         padding: 24px;
         min-height: 100vh;
         overflow-x: auto;
@@ -194,16 +195,18 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         box-shadow: var(--shadow);
         overflow: hidden;
       }}
-      .titlebar {{
-        padding: 10px 16px;
-        background:
-          linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0)),
-          var(--surface-3);
-        border-bottom: 1px solid var(--border-strong);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }}
+.titlebar {{
+         padding: 10px 16px;
+         background: linear-gradient(135deg, var(--blue-dim) 0%, var(--purple-dim) 100%);
+         border-bottom: 1px solid var(--border-strong);
+         display: flex;
+         align-items: center;
+         gap: 10px;
+         border-top-left-radius: 10px;
+         border-top-right-radius: 10px;
+         box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+         transition: all 0.3s ease;
+       }}
       .titlebar-icon {{
         width: 14px; height: 14px;
         border-radius: 50%;
@@ -254,14 +257,19 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
           var(--bg);
       }}
       /* ── Function panel ── */
-      .function-panel {{
-        margin-bottom: 16px;
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        background: rgba(10, 15, 24, 0.72);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
-        overflow: hidden;
-      }}
+.function-panel {{
+         margin-bottom: 16px;
+         border: 1px solid var(--border);
+         border-radius: 10px;
+         background: rgba(15, 23, 42, 0.9);
+         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255,255,255,0.02);
+         overflow: hidden;
+         transition: transform 0.3s ease, box-shadow 0.3s ease;
+       }}
+       .function-panel:hover {{
+         transform: translateY(-2px);
+         box-shadow: 0 12px 48px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255,255,255,0.02);
+       }}
       .function-panel:last-child {{ margin-bottom: 0; }}
       .function-head {{
         padding: 12px 16px;
@@ -307,12 +315,13 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-catches > .ns-node + .ns-node {{
         margin-top: -1px;
       }}
-      .ns-node {{
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        background: var(--action-fill);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
-      }}
+.ns-node {{
+         border: 1px solid var(--border);
+         border-radius: 6px;
+         background: var(--action-fill);
+         box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+         transition: all 0.2s ease;
+       }}
       /* ── Block headers/footers ── */
       .ns-header,
       .ns-footer,
@@ -617,10 +626,11 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         min-width: 100%;
       }}
       .ns-branches-single {{ grid-template-columns: max-content; }}
-      .ns-branch {{
-        border-left: 2px solid var(--border);
-        background: var(--surface-2);
-      }}
+.ns-branch {{
+         border-left: 2px solid var(--border);
+         background: var(--surface-2);
+         transition: all 0.2s ease;
+       }}
       .ns-branch-yes {{
         background: rgba(158, 206, 106, 0.08);
       }}
@@ -652,16 +662,17 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         color: var(--red);
       }}
       .ns-branch:first-child {{ border-left: 0; }}
-      .ns-branch-title {{
-        padding: 7px 12px;
-        border-bottom: 1px solid var(--border);
-        background: rgba(18, 26, 41, 0.92);
-        color: var(--muted);
-        font-size: 10.5px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }}
+.ns-branch-title {{
+         padding: 7px 12px;
+         border-bottom: 1px solid var(--border);
+         background: rgba(18, 26, 41, 0.92);
+         color: var(--muted);
+         font-size: 10.5px;
+         font-weight: 600;
+         text-transform: uppercase;
+         letter-spacing: 0.08em;
+         transition: all 0.2s ease;
+       }}
       .ns-cases {{ background: var(--surface-2); }}
       .case {{ border-top: 1px solid var(--border); }}
       .case:first-child {{ border-top: 0; }}
