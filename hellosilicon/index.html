@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ARM64 NSD Index</title>
+    <style>
+      :root {
+        --line: #22364d;
+        --page: #d9e0e7;
+        --panel: #f6f1e1;
+        --panel-2: #fffdf8;
+        --text: #112033;
+        --muted: #5f6e7c;
+        --blue: #1676dc;
+        --blue-dark: #0b57ae;
+        --shadow: 0 18px 40px rgba(21, 34, 52, 0.18);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        color: var(--text);
+        background: linear-gradient(180deg, #e3e8ee 0%, var(--page) 100%);
+      }
+      .window {
+        max-width: 1120px;
+        margin: 0 auto;
+        border: 2px solid var(--line);
+        background: var(--panel);
+        box-shadow: var(--shadow);
+      }
+      .titlebar {
+        padding: 8px 14px;
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 700;
+        background: linear-gradient(180deg, #3394ff 0%, var(--blue) 48%, var(--blue-dark) 100%);
+      }
+      .body {
+        padding: 16px;
+      }
+      .meta {
+        margin: 0 0 14px;
+        color: var(--muted);
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: var(--panel-2);
+      }
+      th, td {
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        color: #ffffff;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        background: linear-gradient(180deg, var(--blue) 0%, var(--blue-dark) 100%);
+      }
+      td:nth-child(2) {
+        width: 110px;
+        text-align: center;
+        white-space: nowrap;
+      }
+      a {
+        color: #0f58ad;
+        text-decoration: none;
+        font-weight: 700;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      @media (max-width: 800px) {
+        body { padding: 12px; }
+        .body { padding: 10px; }
+        table, thead, tbody, tr, th, td {
+          display: block;
+        }
+        thead {
+          display: none;
+        }
+        tr {
+          margin-bottom: 12px;
+          border: 1px solid var(--line);
+          background: var(--panel-2);
+        }
+        td {
+          border: 0;
+          border-top: 1px solid var(--line);
+        }
+        td:first-child {
+          border-top: 0;
+        }
+        td:nth-child(2) {
+          width: auto;
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="window">
+      <div class="titlebar">ARM64 NSD Index</div>
+      <div class="body">
+        <p class="meta">/private/tmp/HelloSilicon</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>Functions</th>
+              <th>Names</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td><a href="Chapter 01/HelloWorld.nassi.html">Chapter 01/HelloWorld.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 02/addexamp1.nassi.html">Chapter 02/addexamp1.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 02/addexamp2.nassi.html">Chapter 02/addexamp2.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 02/addexamps.nassi.html">Chapter 02/addexamps.s</a></td><td>1</td><td>&lt;module&gt;</td></tr><tr><td><a href="Chapter 02/codesnippets.nassi.html">Chapter 02/codesnippets.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 02/movexamps.nassi.html">Chapter 02/movexamps.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 03/HelloWorld.nassi.html">Chapter 03/HelloWorld.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 04/case.nassi.html">Chapter 04/case.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 04/codesnippets.nassi.html">Chapter 04/codesnippets.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 04/printdword.nassi.html">Chapter 04/printdword.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 05/codesnippets.nassi.html">Chapter 05/codesnippets.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 05/upper.nassi.html">Chapter 05/upper.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 06/codesnippets.nassi.html">Chapter 06/codesnippets.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 06/main.nassi.html">Chapter 06/main.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 06/mainmacro.nassi.html">Chapter 06/mainmacro.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 06/upper.nassi.html">Chapter 06/upper.s</a></td><td>1</td><td>toupper</td></tr><tr><td><a href="Chapter 06/uppermacro.nassi.html">Chapter 06/uppermacro.s</a></td><td>1</td><td>&lt;module&gt;</td></tr><tr><td><a href="Chapter 07/fileio.nassi.html">Chapter 07/fileio.S</a></td><td>1</td><td>&lt;module&gt;</td></tr><tr><td><a href="Chapter 07/main.nassi.html">Chapter 07/main.S</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 07/upper.nassi.html">Chapter 07/upper.s</a></td><td>1</td><td>toupper</td></tr><tr><td><a href="Chapter 09/addexamp2.nassi.html">Chapter 09/addexamp2.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 09/debug.nassi.html">Chapter 09/debug.s</a></td><td>1</td><td>&lt;module&gt;</td></tr><tr><td><a href="Chapter 09/test.nassi.html">Chapter 09/test.s</a></td><td>1</td><td>_main</td></tr><tr><td><a href="Chapter 09/upper.nassi.html">Chapter 09/upper.s</a></td><td>1</td><td>_mytoupper</td></tr><tr><td><a href="Chapter 10/ToUpper/Shared/upper.nassi.html">Chapter 10/ToUpper/Shared/upper.s</a></td><td>1</td><td>_mytoupper</td></tr><tr><td><a href="Chapter 11/debug.nassi.html">Chapter 11/debug.s</a></td><td>1</td><td>&lt;module&gt;</td></tr><tr><td><a href="Chapter 11/divexamp.nassi.html">Chapter 11/divexamp.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 11/matrixmult.nassi.html">Chapter 11/matrixmult.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 11/mulexamp.nassi.html">Chapter 11/mulexamp.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 12/codesnippets.nassi.html">Chapter 12/codesnippets.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 12/debug.nassi.html">Chapter 12/debug.s</a></td><td>1</td><td>&lt;module&gt;</td></tr><tr><td><a href="Chapter 12/distance.nassi.html">Chapter 12/distance.s</a></td><td>1</td><td>distance</td></tr><tr><td><a href="Chapter 12/fpcomp.nassi.html">Chapter 12/fpcomp.s</a></td><td>1</td><td>fpcomp</td></tr><tr><td><a href="Chapter 12/main.nassi.html">Chapter 12/main.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 12/maincomp.nassi.html">Chapter 12/maincomp.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 13/distance.nassi.html">Chapter 13/distance.s</a></td><td>1</td><td>distance</td></tr><tr><td><a href="Chapter 13/main.nassi.html">Chapter 13/main.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 13/matrixmultneon.nassi.html">Chapter 13/matrixmultneon.s</a></td><td>1</td><td>main</td></tr><tr><td><a href="Chapter 14/main.nassi.html">Chapter 14/main.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 14/upper.nassi.html">Chapter 14/upper.s</a></td><td>1</td><td>toupper</td></tr><tr><td><a href="Chapter 14/upper2.nassi.html">Chapter 14/upper2.s</a></td><td>1</td><td>toupper</td></tr><tr><td><a href="Chapter 14/upper3.nassi.html">Chapter 14/upper3.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 14/upper4.nassi.html">Chapter 14/upper4.s</a></td><td>1</td><td>toupper</td></tr><tr><td><a href="Chapter 16/main.nassi.html">Chapter 16/main.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 16/mainpie.nassi.html">Chapter 16/mainpie.s</a></td><td>1</td><td>_start</td></tr><tr><td><a href="Chapter 16/upper.nassi.html">Chapter 16/upper.s</a></td><td>1</td><td>toupper</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>
