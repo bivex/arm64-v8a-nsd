@@ -120,7 +120,18 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nassi-Shneiderman Control Flow</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Highlight.js for syntax highlighting -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/asm.min.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {{
+        document.querySelectorAll('pre.hljs').forEach(function(block) {{
+          hljs.highlightElement(block);
+        }});
+      }});
+    </script>
     <style>
       :root {{
         /* Palette — editor-first dark */
@@ -693,10 +704,107 @@ background:
         border-top: 1px solid var(--border);
         padding: 8px 12px;
       }}
-      .empty-file {{
-        padding: 24px;
-        color: var(--muted);
-      }}
+.modal {{
+         display: none;
+         position: fixed;
+         z-index: 1000;
+         left: 0;
+         top: 0;
+         width: 100%;
+         height: 100%;
+         overflow: auto;
+         background-color: rgba(0,0,0,0.7);
+         animation: fadeIn 0.3s ease;
+       }}
+       @keyframes fadeIn {{
+         from {{ opacity: 0; }}
+         to {{ opacity: 1; }}
+       }}
+       .modal-content {{
+         background-color: var(--surface);
+         margin: 5% auto;
+         padding: 20px;
+         border-radius: 12px;
+         border: 1px solid var(--border);
+         width: 80%;
+         max-width: 1000px;
+         box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+         animation: slideDown 0.3s ease;
+       }}
+       @keyframes slideDown {{
+         from {{ transform: translateY(-50px); opacity: 0; }}
+         to {{ transform: translateY(0); opacity: 1; }}
+       }}
+       .close-btn {{
+         color: var(--muted);
+         float: right;
+         font-size: 28px;
+         font-weight: bold;
+         cursor: pointer;
+         transition: color 0.2s ease;
+       }}
+       .close-btn:hover {{
+         color: var(--red);
+       }}
+       .modal-title {{
+         font-size: 20px;
+         font-weight: 600;
+         color: var(--text-bright);
+         margin-bottom: 16px;
+         border-bottom: 1px solid var(--border);
+         padding-bottom: 8px;
+       }}
+       .code-block {{
+         background-color: var(--bg-accent);
+         color: var(--text);
+         padding: 16px;
+         border-radius: 8px;
+         overflow-x: auto;
+         font-family: var(--mono);
+         font-size: 14px;
+         line-height: 1.5;
+         white-space: pre;
+         max-height: 500px;
+         overflow-y: auto;
+       }}
+       .modal-footer {{
+         margin-top: 20px;
+         text-align: right;
+       }}
+       .close-modal-btn {{
+         background-color: var(--blue);
+         color: white;
+         border: none;
+         padding: 8px 16px;
+         border-radius: 6px;
+         cursor: pointer;
+         font-size: 14px;
+         transition: background-color 0.2s ease;
+       }}
+       .close-modal-btn:hover {{
+         background-color: var(--blue-dim);
+       }}
+       .toolbar-btn {{
+         background-color: var(--blue);
+         color: white;
+         border: none;
+         padding: 6px 12px;
+         border-radius: 6px;
+         cursor: pointer;
+         font-size: 13px;
+         margin-left: 8px;
+         transition: all 0.2s ease;
+       }}
+       .toolbar-btn:hover {{
+         background-color: var(--blue-dim);
+         transform: translateY(-1px);
+       }}
+       .view-code-btn {{
+         background-color: var(--green-dim);
+       }}
+       .view-code-btn:hover {{
+         background-color: var(--green);
+       }}
 
       @media (max-width: 800px) {{
         body {{ padding: 12px; }}
@@ -737,7 +845,89 @@ background:
       <div class="toolbar">
         <span class="toolbar-label">Nassi-Shneiderman</span>
         <code class="toolbar-path">{escape(diagram.source_location)}</code>
+        <a href="{escape(diagram.source_location)}" target="_blank" class="toolbar-btn view-code-btn">View Code</a>
       </div>
+      <!-- Hidden modal for code viewing -->
+      <div id="codeModal" class="modal">
+        <div class="modal-content">
+          <span class="close-btn" onclick="closeCodeModal()">&times;</span>
+          <h3 class="modal-title">Source Code</h3>
+          <pre class="code-block hljs language-asm"><code id="modalCode"></code></pre>
+          <div class="modal-footer">
+            <button class="close-modal-btn" onclick="closeCodeModal()">Close</button>
+          </div>
+        </div>
+      </div>
+      <script>
+        // Get the modal
+        var modal = document.getElementById('codeModal');
+        
+        // Get the button that opens the modal
+        var btn = document.querySelector('.view-code-btn');
+        
+        // Get the <span> element that closes the modal
+        var span = document.getElementsByClassName('close-btn')[0];
+        var closeBtn = document.querySelector('.close-modal-btn');
+        
+        // When the user clicks the button, open the modal AND load code
+        btn.onclick = function() {{
+          modal.style.display = 'block';
+          var codePath = btn.getAttribute('data-code-path');
+          if (!codePath) {{
+            // Fallback to current source location
+            codePath = '{escape(diagram.source_location)}';
+          }}
+          fetchCode(codePath);
+        }}
+        
+        // When the user clicks on <span> (x), close the modal
+        span.onclick = function() {{
+          modal.style.display = 'none';
+        }}
+        
+        // When the user clicks on close button, close the modal
+        closeBtn.onclick = function() {{
+          modal.style.display = 'none';
+        }}
+        
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {{
+          if (event.target == modal) {{
+            modal.style.display = 'none';
+          }}
+        }}
+        
+        function fetchCode(path) {{
+          // Store the path for later use
+          btn.setAttribute('data-code-path', path);
+          
+          // Fetch the file content
+          fetch(path)
+            .then(response => response.text())
+            .then(text => {{
+              // Escape HTML and set code
+              var codeEl = document.getElementById('modalCode');
+              codeEl.textContent = text;
+              // Re-highlight with Highlight.js
+              hljs.highlightElement(codeEl.parentElement);
+            }})
+            .catch(error => {{
+              console.error('Error fetching file:', error);
+              document.getElementById('modalCode').textContent = 'Error loading file.';
+            }});
+        }}
+        
+        function showCodeModal(path) {{
+          var modal = document.getElementById('codeModal');
+          modal.style.display = 'block';
+          fetchCode(path);
+        }}
+        
+        function closeCodeModal() {{
+          var modal = document.getElementById('codeModal');
+          modal.style.display = 'none';
+        }}
+      </script>
       <main class="viewer-body">{sections}</main>
     </div>
   </body>
