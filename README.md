@@ -39,6 +39,10 @@ ARM64/AArch64 assembly to Nassi-Shneiderman diagram converter. Parses GAS/Clang-
 
 ![Tour overview](docs/screenshots/tour_overview.png)
 
+**10 if/else patterns** — comprehensive demonstration of conditional branching (cbz, cbnz, tbz, tbnz, nested conditions, fcmp):
+
+![10 if/else patterns](docs/screenshots/if_else_10.png)
+
 ## Architecture
 
 DDD-inspired hexagonal architecture with four explicit layers:
