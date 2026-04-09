@@ -43,6 +43,18 @@ class ReturnStep(ControlFlowStep):
 
 
 @dataclass(frozen=True, slots=True)
+class PrologueStep(ControlFlowStep):
+    """Function prologue: stack frame setup (stp fp/lr, sub sp, mov fp)."""
+    instructions: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class EpilogueStep(ControlFlowStep):
+    """Function epilogue: stack frame teardown (ldp fp/lr, add sp)."""
+    instructions: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class BreakStep(ControlFlowStep):
     label: str
 

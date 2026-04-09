@@ -334,6 +334,84 @@ def is_register(token: str) -> bool:
     return token.lower().strip() in ALL_REGISTERS
 
 
+# ---------------------------------------------------------------------------
+# Stack frame helpers
+# ---------------------------------------------------------------------------
+
+_STACK_FRAME_REGISTERS: frozenset[str] = frozenset({"fp", "lr", "x29", "x30"})
+
+
+def is_prologue_instruction(mnemonic: str, operands: str) -> bool:
+    """True when the instruction is a typical function prologue operation.
+
+    Recognised patterns:
+      - stp x29, x30, [sp, #... ]!   (push frame record)
+      - stp fp, lr, [sp, #...]!
+      - sub sp, sp, #N               (allocate stack frame)
+      - mov x29, sp                  (set frame pointer)
+      - mov fp, sp
+      - add x29, sp, #0
+    """
+    mnem = mnemonic.lower()
+    ops = operands.lower().replace(" ", "")
+
+    # stp with fp/lr/x29/x30 targeting [sp, ...]!
+    if mnem == "stp":
+        has_frame_reg = any(r in ops for r in _STACK_FRAME_REGISTERS)
+        has_sp = "sp" in ops and ("[sp" in ops or ",sp" in ops)
+        return has_frame_reg and has_sp
+
+    # sub sp, sp, #N or sub sp, sp, N
+    if mnem == "sub":
+        parts = [p.strip() for p in operands.split(",")]
+        if len(parts) >= 2 and parts[0].strip().lower() == "sp" and parts[1].strip().lower() == "sp":
+            return True
+
+    # mov x29, sp / mov fp, sp / add x29, sp, #0
+    if mnem == "mov":
+        parts = [p.strip() for p in operands.split(",")]
+        if len(parts) >= 2 and parts[0].strip().lower() in ("x29", "fp") and parts[1].strip().lower() == "sp":
+            return True
+
+    if mnem == "add":
+        parts = [p.strip() for p in operands.split(",")]
+        if len(parts) >= 2 and parts[0].strip().lower() in ("x29", "fp") and parts[1].strip().lower() == "sp":
+            return True
+
+    return False
+
+
+def is_epilogue_instruction(mnemonic: str, operands: str) -> bool:
+    """True when the instruction is a typical function epilogue operation.
+
+    Recognised patterns:
+      - ldp x29, x30, [sp], #N      (pop frame record)
+      - ldp fp, lr, [sp], #N
+      - add sp, sp, #N               (deallocate stack frame)
+      - mov sp, x29 / mov sp, fp     (restore sp from frame pointer)
+    """
+    mnem = mnemonic.lower()
+    ops = operands.lower().replace(" ", "")
+
+    # ldp with fp/lr/x29/x30 from [sp], #N
+    if mnem == "ldp":
+        has_frame_reg = any(r in ops for r in _STACK_FRAME_REGISTERS)
+        has_sp = "sp" in ops and ("[sp" in ops or ",sp" in ops)
+        return has_frame_reg and has_sp
+
+    # add sp, sp, #N
+    if mnem in ("add", "mov"):
+        parts = [p.strip() for p in operands.split(",")]
+        if len(parts) >= 2 and parts[0].strip().lower() == "sp":
+            src = parts[1].strip().lower()
+            if mnem == "mov" and src in ("x29", "fp"):
+                return True
+            if mnem == "add" and src == "sp":
+                return True
+
+    return False
+
+
 def is_directive(token: str) -> bool:
     """True when *token* starts with ``.`` and matches a known directive name."""
     if not token.startswith("."):

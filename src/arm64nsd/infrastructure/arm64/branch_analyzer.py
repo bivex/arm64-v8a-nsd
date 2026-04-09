@@ -10,10 +10,12 @@ from arm64nsd.domain.control_flow import (
     CallFlowStep,
     ContinueStep,
     ControlFlowStep,
+    EpilogueStep,
     IfFlowStep,
     IndirectBranchStep,
     InlineIfStep,
     InfiniteLoopStep,
+    PrologueStep,
     RepeatWhileFlowStep,
     ReturnStep,
     SwitchCaseFlow,
@@ -25,6 +27,8 @@ from arm64nsd.infrastructure.arm64.instruction_set import (
     CONDITIONAL_SELECT_MNEMONICS,
     branch_condition,
     is_conditional_branch,
+    is_epilogue_instruction,
+    is_prologue_instruction,
     is_return,
     is_unconditional_branch,
     negate_condition,
@@ -772,6 +776,40 @@ class BranchAnalyzer:
                         steps.append(BreakStep(label=label))
                 elif mnem in CONDITIONAL_SELECT_MNEMONICS:
                     steps.append(InlineIfStep(expression=line.instruction_text))
+                elif is_prologue_instruction(mnem, line.operands or ""):
+                    prologue_ins = [line.instruction_text]
+                    scan = index + 1
+                    while scan < end and scan < len(self._lines):
+                        nxt = self._lines[scan]
+                        if not nxt.is_instruction or scan in covered:
+                            break
+                        nxt_mnem = (nxt.mnemonic or "").lower()
+                        if is_prologue_instruction(nxt_mnem, nxt.operands or ""):
+                            prologue_ins.append(nxt.instruction_text)
+                            covered[scan] = "prologue"
+                            scan += 1
+                        else:
+                            break
+                    steps.append(PrologueStep(instructions=tuple(prologue_ins)))
+                    index = scan
+                    continue
+                elif is_epilogue_instruction(mnem, line.operands or ""):
+                    epilogue_ins = [line.instruction_text]
+                    scan = index + 1
+                    while scan < end and scan < len(self._lines):
+                        nxt = self._lines[scan]
+                        if not nxt.is_instruction or scan in covered:
+                            break
+                        nxt_mnem = (nxt.mnemonic or "").lower()
+                        if is_epilogue_instruction(nxt_mnem, nxt.operands or ""):
+                            epilogue_ins.append(nxt.instruction_text)
+                            covered[scan] = "epilogue"
+                            scan += 1
+                        else:
+                            break
+                    steps.append(EpilogueStep(instructions=tuple(epilogue_ins)))
+                    index = scan
+                    continue
                 else:
                     text = line.instruction_text
                     if text.strip():

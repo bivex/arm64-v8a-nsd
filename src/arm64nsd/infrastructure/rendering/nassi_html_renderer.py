@@ -13,10 +13,12 @@ from arm64nsd.domain.control_flow import (
     ContinueStep,
     ControlFlowDiagram,
     ControlFlowStep,
+    EpilogueStep,
     IfFlowStep,
     IndirectBranchStep,
     InlineIfStep,
     InfiniteLoopStep,
+    PrologueStep,
     RepeatWhileFlowStep,
     ReturnStep,
     SwitchCaseFlow,
@@ -314,6 +316,30 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-node.ns-continue {{ border-left: 3px solid var(--amber); background: var(--amber-dim); }}
       .ns-node.ns-inline-if {{ border-left: 3px solid var(--purple); background: var(--purple-dim); }}
       .ns-node.ns-indirect {{ border-left: 3px solid var(--teal); background: var(--teal-dim); }}
+      .ns-node.ns-prologue {{ border-left: 3px solid #5e6883; background: rgba(30, 38, 55, 0.85); }}
+      .ns-node.ns-epilogue {{ border-left: 3px solid #5e6883; background: rgba(30, 38, 55, 0.85); }}
+      .stack-text {{
+        display: block;
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.65;
+        color: #7b87a5;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }}
+      .stack-badge {{
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        padding: 2px 6px;
+        border-radius: 3px;
+        margin-bottom: 4px;
+      }}
+      .stack-badge-prologue {{ background: rgba(94, 104, 131, 0.25); color: #8e9bbb; }}
+      .stack-badge-epilogue {{ background: rgba(94, 104, 131, 0.25); color: #8e9bbb; }}
       .ns-indirect .call-text {{ color: var(--teal); }}
       .ns-infinite > .ns-header {{ background: var(--red-dim); color: var(--red); }}
       .call-text {{
@@ -661,6 +687,26 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             return (
                 '<div class="ns-node ns-continue">'
                 f'<div class="ns-label"><code class="break-text">continue {escape(step.label)}</code></div>'
+                "</div>"
+            )
+        if isinstance(step, PrologueStep):
+            body = "\n".join(step.instructions)
+            return (
+                '<div class="ns-node ns-prologue">'
+                '<div class="ns-label">'
+                '<span class="stack-badge stack-badge-prologue">prologue</span>'
+                f'<code class="stack-text">{escape(body)}</code>'
+                "</div>"
+                "</div>"
+            )
+        if isinstance(step, EpilogueStep):
+            body = "\n".join(step.instructions)
+            return (
+                '<div class="ns-node ns-epilogue">'
+                '<div class="ns-label">'
+                '<span class="stack-badge stack-badge-epilogue">epilogue</span>'
+                f'<code class="stack-text">{escape(body)}</code>'
+                "</div>"
                 "</div>"
             )
         if isinstance(step, IfFlowStep):

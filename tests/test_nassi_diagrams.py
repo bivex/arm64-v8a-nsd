@@ -8,8 +8,10 @@ from arm64nsd.domain.control_flow import (
     ActionFlowStep,
     ContinueStep,
     ControlFlowDiagram,
+    EpilogueStep,
     FunctionControlFlow,
     IfFlowStep,
+    PrologueStep,
     SwitchCaseFlow,
     SwitchFlowStep,
     WhileFlowStep,
@@ -369,3 +371,38 @@ class TestArm64ControlFlowExtraction:
             f"Expected ContinueStep in while body, got: "
             f"{[type(s).__name__ for s in while_step.body_steps]}"
         )
+
+    def test_prologue_epilogue_detected(self) -> None:
+        extractor = _build_extractor()
+        from arm64nsd.domain.model import SourceUnit, SourceUnitId
+
+        source = SourceUnit(
+            identifier=SourceUnitId("stack.s"),
+            location="stack.s",
+            content=(
+                "    .text\n"
+                "    .global _frame\n"
+                "_frame:\n"
+                "    stp x29, x30, [sp, #-32]!\n"
+                "    mov x29, sp\n"
+                "    sub sp, sp, #16\n"
+                "    mov x0, #42\n"
+                "    add sp, sp, #16\n"
+                "    ldp x29, x30, [sp], #32\n"
+                "    ret\n"
+            ),
+        )
+        diagram = extractor.extract(source)
+
+        func = diagram.functions[0]
+        types = [type(s).__name__ for s in func.steps]
+        assert "PrologueStep" in types, f"Expected PrologueStep, got: {types}"
+        assert "EpilogueStep" in types, f"Expected EpilogueStep, got: {types}"
+
+        prologue = next(s for s in func.steps if isinstance(s, PrologueStep))
+        assert len(prologue.instructions) == 3  # stp + mov + sub sp
+        assert any("stp" in i for i in prologue.instructions)
+
+        epilogue = next(s for s in func.steps if isinstance(s, EpilogueStep))
+        assert len(epilogue.instructions) == 2  # add sp + ldp
+        assert any("ldp" in i for i in epilogue.instructions)
