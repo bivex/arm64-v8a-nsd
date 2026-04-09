@@ -14,7 +14,9 @@ from arm64nsd.domain.model import SourceUnit
 from arm64nsd.domain.ports import Arm64ControlFlowExtractor
 from arm64nsd.infrastructure.arm64.branch_analyzer import BranchAnalyzer
 from arm64nsd.infrastructure.arm64.instruction_set import is_return
+from arm64nsd.infrastructure.arm64.macro_expander import MacroExpander
 from arm64nsd.infrastructure.arm64.tokenizer import Arm64Line, Arm64Tokenizer
+from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,9 +32,29 @@ class Arm64AsmControlFlowExtractor(Arm64ControlFlowExtractor):
 
     def __init__(self) -> None:
         self._tokenizer = Arm64Tokenizer()
+        self._macro_expander = MacroExpander(source_resolver=self._resolve_include_path)
+
+    def _resolve_include_path(self, path: str) -> str | None:
+        """Resolve .include path to file content.
+
+        Args:
+            path: Path from .include directive
+
+        Returns:
+            File content as string, or None if not found
+        """
+        try:
+            include_path = Path(path).expanduser().resolve()
+            if include_path.exists():
+                return include_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            pass
+        return None
 
     def extract(self, source_unit: SourceUnit) -> ControlFlowDiagram:
-        lines = self._tokenizer.tokenize(source_unit.content)
+        # Expand macros first
+        expanded_content = self._macro_expander.expand(source_unit.content, source_unit.location)
+        lines = self._tokenizer.tokenize(expanded_content)
         boundaries = self._detect_function_boundaries(lines)
         functions: list[FunctionControlFlow] = []
 
