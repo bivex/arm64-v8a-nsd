@@ -378,7 +378,25 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         font-family: var(--mono);
         font-size: 13px;
         line-height: 1.72;
+        color: var(--text);
+      }}
+      .inline-if-badge {{
+        display: inline-block;
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 7px;
+        border-radius: 3px;
+        margin-bottom: 4px;
+        background: rgba(196, 167, 255, 0.15);
         color: var(--purple);
+        border: 1px solid rgba(196, 167, 255, 0.3);
+      }}
+      .inline-if-cond {{
+        color: var(--purple);
+        font-weight: 500;
       }}
 
       /* Depth tinting */
@@ -659,10 +677,16 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 "</div>"
             )
         if isinstance(step, InlineIfStep):
+            # Parse instruction like "csel x0, x1, x2, le" into mnemonic + condition
+            parts = step.expression.split(maxsplit=1)
+            mnemonic = parts[0] if parts else step.expression
+            cond = parts[1] if len(parts) > 1 else ""
+            cond_html = f' <span class="inline-if-cond">{escape(cond)}</span>' if cond else ''
             return (
                 '<div class="ns-node ns-inline-if">'
-                f'<div class="ns-label" aria-label="Inline conditional">'
-                f'<code class="inline-if-text">? {escape(step.expression)}</code>'
+                '<div class="ns-label">'
+                '<span class="inline-if-badge">inline if</span>'
+                f'<code class="inline-if-text"><br/>{escape(mnemonic)}{cond_html}</code>'
                 "</div>"
                 "</div>"
             )

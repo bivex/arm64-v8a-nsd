@@ -240,7 +240,7 @@ def test_nassi_dir_cli_writes_html_bundle(tmp_path: Path) -> None:
 
     assert result.returncode == 0, f"stderr: {result.stderr}"
     payload = json.loads(result.stdout)
-    assert payload["document_count"] == 3
+    assert payload["document_count"] == 4
     assert (output_dir / "index.html").exists()
     html = (output_dir / "index.html").read_text(encoding="utf-8")
     assert "ARM64 NSD Index" in html

@@ -89,7 +89,7 @@ def test_source_repository_lists_asm_files() -> None:
     repo = FileSystemSourceRepository()
     sources = repo.list_asm_sources(str(ROOT / "tests" / "fixtures"))
 
-    assert len(sources) == 3  # simple.s, control_flow.s, invalid.s
+    assert len(sources) == 4  # simple.s, control_flow.s, invalid.s, if_else_10.s
     suffixes = {Path(s.location).suffix for s in sources}
     assert suffixes == {".s"}
 
