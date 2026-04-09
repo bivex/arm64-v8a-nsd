@@ -8,10 +8,15 @@ import re
 
 from arm64nsd.domain.control_flow import (
     ActionFlowStep,
+    BreakStep,
+    CallFlowStep,
+    ContinueStep,
     ControlFlowDiagram,
     ControlFlowStep,
     IfFlowStep,
+    InfiniteLoopStep,
     RepeatWhileFlowStep,
+    ReturnStep,
     SwitchCaseFlow,
     SwitchFlowStep,
     WhileFlowStep,
@@ -297,6 +302,32 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-node.ns-loop,
       .ns-node.ns-repeat  {{ border-left: 3px solid var(--blue); }}
       .ns-node.ns-switch  {{ border-left: 3px solid var(--teal); }}
+      .ns-node.ns-call    {{ border-left: 3px solid var(--orange); background: var(--orange-dim); }}
+      .ns-node.ns-return  {{ border-left: 3px solid var(--muted); background: rgba(20, 28, 41, 0.92); }}
+      .ns-node.ns-infinite {{ border-left: 3px solid var(--red); background: var(--red-dim); }}
+      .ns-node.ns-break,
+      .ns-node.ns-continue {{ border-left: 3px solid var(--amber); background: var(--amber-dim); }}
+      .ns-infinite > .ns-header {{ background: var(--red-dim); color: var(--red); }}
+      .call-text {{
+        display: block;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.72;
+        color: var(--orange);
+        letter-spacing: -0.01em;
+        font-variant-ligatures: none;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }}
+      .return-text {{
+        display: block;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.72;
+        color: var(--muted);
+        font-style: italic;
+        letter-spacing: -0.01em;
+      }}
 
       /* Depth tinting */
       .ns-depth-1 > .ns-node {{ background-color: rgba(255,255,255,0.012); }}
@@ -557,6 +588,40 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 f'<div class="ns-label" aria-label="Action {escape(step.label)}">'
                 f'<code class="action-text">{escape(step.label)}</code>'
                 "</div>"
+                "</div>"
+            )
+        if isinstance(step, CallFlowStep):
+            return (
+                '<div class="ns-node ns-call">'
+                f'<div class="ns-label" aria-label="Call {escape(step.target)}">'
+                f'<code class="call-text">call {escape(step.target)}</code>'
+                "</div>"
+                "</div>"
+            )
+        if isinstance(step, ReturnStep):
+            return (
+                '<div class="ns-node ns-return">'
+                '<div class="ns-label" aria-label="Return">'
+                '<code class="return-text">ret</code>'
+                "</div>"
+                "</div>"
+            )
+        if isinstance(step, InfiniteLoopStep):
+            return (
+                '<div class="ns-node ns-infinite">'
+                '<div class="ns-header">Infinite Loop</div>'
+                "</div>"
+            )
+        if isinstance(step, BreakStep):
+            return (
+                '<div class="ns-node ns-break">'
+                f'<div class="ns-label"><code class="break-text">break {escape(step.label)}</code></div>'
+                "</div>"
+            )
+        if isinstance(step, ContinueStep):
+            return (
+                '<div class="ns-node ns-continue">'
+                f'<div class="ns-label"><code class="break-text">continue {escape(step.label)}</code></div>'
                 "</div>"
             )
         if isinstance(step, IfFlowStep):

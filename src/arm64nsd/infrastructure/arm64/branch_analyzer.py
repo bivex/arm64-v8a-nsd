@@ -6,9 +6,14 @@ from dataclasses import dataclass
 
 from arm64nsd.domain.control_flow import (
     ActionFlowStep,
+    BreakStep,
+    CallFlowStep,
+    ContinueStep,
     ControlFlowStep,
     IfFlowStep,
+    InfiniteLoopStep,
     RepeatWhileFlowStep,
+    ReturnStep,
     SwitchCaseFlow,
     SwitchFlowStep,
     WhileFlowStep,
@@ -104,6 +109,83 @@ class BranchAnalyzer:
     # Map building
     # ------------------------------------------------------------------
 
+    # Instructions that set flags and precede conditional branches
+    _FLAG_SETTING_MNEMONICS = frozenset({
+        "cmp", "cmn", "tst", "ands", "bics", "adds", "subs",
+    })
+
+    @staticmethod
+    def _render_condition(condition_code: str, left: str, right: str) -> str:
+        """Render a human-readable condition from code + cmp operands."""
+        ops: dict[str, str] = {
+            "eq": "==", "ne": "!=",
+            "gt": ">",  "lt": "<",
+            "ge": ">=", "le": "<=",
+            "hi": ">",  "lo": "<",       # unsigned
+            "hs": ">=", "ls": "<=",      # unsigned
+            "mi": "< 0", "pl": ">= 0",
+            "vs": "overflow", "vc": "no overflow",
+        }
+        op = ops.get(condition_code, condition_code)
+        if op in ("< 0", ">= 0", "overflow", "no overflow"):
+            return f"{left} {op}"
+        return f"{left} {op} {right}"
+
+    def _rich_condition(self, branch_index: int, condition_code: str) -> str:
+        """Build a rich condition string by inspecting the flag-setting instruction
+        before the branch.  Falls back to the raw condition code.
+
+        *condition_code* may already be negated (e.g. the if-else detector negates
+        the branch condition to get the if-condition).  For cbz/cbnz/tbz/tbnz the
+        condition_code is compared to the "natural" output of the instruction to
+        decide whether to negate the rendered text.
+        """
+        branch_line = self._lines[branch_index]
+        branch_mnem = (branch_line.mnemonic or "").lower()
+
+        # cbz/cbnz — the register is the first operand
+        if branch_mnem in ("cbz", "cbnz"):
+            parts = [p.strip() for p in branch_line.operands.split(",")]
+            reg = parts[0] if parts else "?"
+            natural_cond = "eq" if branch_mnem == "cbz" else "ne"
+            # If condition_code was negated relative to the natural branch sense,
+            # flip the rendered operator.
+            if condition_code != natural_cond:
+                return f"{reg} != 0" if branch_mnem == "cbz" else f"{reg} == 0"
+            return f"{reg} == 0" if branch_mnem == "cbz" else f"{reg} != 0"
+
+        # tbz/tbnz — register and bit are in operands
+        if branch_mnem in ("tbz", "tbnz"):
+            parts = [p.strip() for p in branch_line.operands.split(",")]
+            reg = parts[0] if len(parts) >= 1 else "?"
+            bit = parts[1] if len(parts) >= 2 else "?"
+            natural_cond = "eq" if branch_mnem == "tbz" else "ne"
+            if condition_code != natural_cond:
+                return f"{reg}[{bit}] != 0" if branch_mnem == "tbz" else f"{reg}[{bit}] == 0"
+            return f"{reg}[{bit}] == 0" if branch_mnem == "tbz" else f"{reg}[{bit}] != 0"
+
+        # b.cond — look for preceding cmp/subs/ands/tst
+        for i in range(branch_index - 1, -1, -1):
+            line = self._lines[i]
+            if not line.is_instruction:
+                continue
+            mnem = (line.mnemonic or "").lower()
+            if mnem in self._FLAG_SETTING_MNEMONICS:
+                parts = [p.strip() for p in line.operands.split(",")]
+                if mnem == "cmp" and len(parts) == 2:
+                    return self._render_condition(condition_code, parts[0], parts[1])
+                if mnem == "cmn" and len(parts) == 2:
+                    return self._render_condition(condition_code, parts[0], f"-{parts[1]}")
+                if mnem == "tst" and len(parts) == 2:
+                    return f"{parts[0]} & {parts[1]} != 0" if condition_code != "eq" else f"{parts[0]} & {parts[1]} == 0"
+                if mnem in ("adds", "subs") and len(parts) >= 2:
+                    return self._render_condition(condition_code, parts[0], parts[1])
+                break
+            # Stop at other instructions that aren't labels/comments
+            if line.mnemonic is not None:
+                break
+        return condition_code
+
     def _label_at(self, line_index: int) -> str | None:
         """Return the label name at *line_index*, if any."""
         for label_name, label_index in self._label_map.items():
@@ -190,7 +272,9 @@ class BranchAnalyzer:
 
             # Forward conditional branch: this is the "skip then" branch
             # The condition is inverted (branch taken = skip then-body)
-            cond = branch_condition(branch.mnemonic) or "true"
+            raw_cond = branch_condition(branch.mnemonic) or "true"
+            if_cond = negate_condition(raw_cond)
+            cond = self._rich_condition(branch.line_index, if_cond)
 
             then_start = branch.line_index + 1
             else_label = branch.target_label
@@ -214,7 +298,7 @@ class BranchAnalyzer:
                 then_end = end_branch.line_index - 1
                 end_line = end_branch.target_line_index
                 patterns.append(IfElsePattern(
-                    condition=negate_condition(cond),
+                    condition=cond,
                     condition_line=branch.line_index,
                     then_start=then_start,
                     then_end=then_end,
@@ -228,7 +312,7 @@ class BranchAnalyzer:
             else:
                 # if-only pattern (no else)
                 patterns.append(IfElsePattern(
-                    condition=negate_condition(cond),
+                    condition=cond,
                     condition_line=branch.line_index,
                     then_start=then_start,
                     then_end=else_start - 1,
@@ -244,10 +328,8 @@ class BranchAnalyzer:
     def detect_while_loops(self) -> list[WhileLoopPattern]:
         """Detect while loops from backward branches.
 
-        Two patterns are recognised:
-        1. Backward conditional branch (condition at bottom).
-        2. Backward unconditional branch where the target has a forward
-           conditional exit (condition at top).
+        Recognises pre-condition loops: backward unconditional branch where
+        the target has a forward conditional exit inside the body.
         """
         patterns: list[WhileLoopPattern] = []
         used_branches: set[int] = set()
@@ -257,55 +339,46 @@ class BranchAnalyzer:
                 continue
             if branch.is_forward is not False or branch.target_line_index is None:
                 continue
-
-            # --- Pattern 1: backward conditional ---
-            if branch.is_conditional:
-                cond = branch_condition(branch.mnemonic) or "true"
-                header_label = self._label_at(branch.target_line_index)
-                patterns.append(WhileLoopPattern(
-                    header_label=header_label,
-                    header_line=branch.target_line_index,
-                    body_start=branch.target_line_index,
-                    body_end=branch.line_index - 1,
-                    condition_line=branch.line_index,
-                    branch_line=branch.line_index,
-                    condition=cond,
-                ))
-                used_branches.add(branch.line_index)
+            if not is_unconditional_branch(branch.mnemonic):
                 continue
 
-            # --- Pattern 2: backward unconditional with forward conditional exit ---
-            if is_unconditional_branch(branch.mnemonic):
-                header_idx = branch.target_line_index
-                # Scan from header for a forward conditional branch (the loop exit)
-                for other in self._branches:
-                    if (
-                        other.is_conditional
-                        and other.is_forward is True
-                        and other.line_index > header_idx
-                        and other.line_index < branch.line_index
-                        and other.line_index not in used_branches
-                    ):
-                        # The exit condition is on the cmp just before the branch
-                        cond = branch_condition(other.mnemonic) or "true"
-                        header_label = self._label_at(header_idx)
-                        patterns.append(WhileLoopPattern(
-                            header_label=header_label,
-                            header_line=header_idx,
-                            body_start=header_idx,
-                            body_end=branch.line_index - 1,
-                            condition_line=other.line_index,
-                            branch_line=branch.line_index,
-                            condition=cond,
-                        ))
-                        used_branches.add(branch.line_index)
-                        used_branches.add(other.line_index)
-                        break
+            # Backward unconditional branch — look for forward conditional exit
+            header_idx = branch.target_line_index
+            for other in self._branches:
+                if (
+                    other.is_conditional
+                    and other.is_forward is True
+                    and other.line_index > header_idx
+                    and other.line_index < branch.line_index
+                    and other.line_index not in used_branches
+                ):
+                    cond = branch_condition(other.mnemonic) or "true"
+                    cond = self._rich_condition(other.line_index, cond)
+                    header_label = self._label_at(header_idx)
+                    patterns.append(WhileLoopPattern(
+                        header_label=header_label,
+                        header_line=header_idx,
+                        body_start=header_idx,
+                        body_end=branch.line_index - 1,
+                        condition_line=other.line_index,
+                        branch_line=branch.line_index,
+                        condition=cond,
+                    ))
+                    used_branches.add(branch.line_index)
+                    used_branches.add(other.line_index)
+                    break
 
         return patterns
 
     def detect_repeat_loops(self) -> list[RepeatLoopPattern]:
-        """Detect repeat-until loops: body + backward conditional branch to body start."""
+        """Detect repeat-until loops: backward conditional branch to body start.
+
+        This handles the common ARM64 pattern where the body executes first,
+        then a condition is tested at the bottom:
+            label:
+              body...
+              b.cond label   // repeat while condition holds
+        """
         patterns: list[RepeatLoopPattern] = []
         used_branches: set[int] = set()
 
@@ -318,6 +391,7 @@ class BranchAnalyzer:
                 continue
 
             cond = branch_condition(branch.mnemonic) or "true"
+            cond = self._rich_condition(branch.line_index, cond)
 
             body_label = None
             for label_name, label_index in self._label_map.items():
@@ -325,19 +399,89 @@ class BranchAnalyzer:
                     body_label = label_name
                     break
 
-            # Only classify as repeat if branch goes to exactly the body start
-            # and there's no loop header separate from the body
-            body_start = branch.target_line_index
-            if body_start == branch.target_line_index:
-                patterns.append(RepeatLoopPattern(
-                    body_label=body_label,
-                    body_start=body_start,
-                    body_end=branch.line_index - 1,
-                    condition_line=branch.line_index,
-                    branch_line=branch.line_index,
-                    condition=cond,
-                ))
-                used_branches.add(branch.line_index)
+            patterns.append(RepeatLoopPattern(
+                body_label=body_label,
+                body_start=branch.target_line_index,
+                body_end=branch.line_index - 1,
+                condition_line=branch.line_index,
+                branch_line=branch.line_index,
+                condition=cond,
+            ))
+            used_branches.add(branch.line_index)
+
+        return patterns
+
+    def detect_infinite_loops(self) -> list[tuple[int, int]]:
+        """Detect infinite loops: backward unconditional branch with no exit.
+
+        Returns list of (header_line, branch_line) pairs.
+        An infinite loop is a backward unconditional `b` to a label where
+        no forward conditional exit exists between the header and the branch.
+        """
+        loops: list[tuple[int, int]] = []
+        used: set[int] = set()
+
+        for branch in self._branches:
+            if branch.line_index in used:
+                continue
+            if branch.is_conditional or branch.is_forward is not False:
+                continue
+            if branch.target_line_index is None:
+                continue
+            if not is_unconditional_branch(branch.mnemonic) or branch.mnemonic.lower() != "b":
+                continue
+
+            header = branch.target_line_index
+            # Check that NO forward conditional exit exists in the body
+            has_exit = any(
+                other.is_conditional
+                and other.is_forward is True
+                and other.line_index > header
+                and other.line_index < branch.line_index
+                for other in self._branches
+            )
+            if not has_exit:
+                loops.append((header, branch.line_index))
+                used.add(branch.line_index)
+
+        return loops
+        """Detect repeat-until loops: backward conditional branch to body start.
+
+        This handles the common ARM64 pattern where the body executes first,
+        then a condition is tested at the bottom:
+            label:
+              body...
+              b.cond label   // repeat while condition holds
+        """
+        patterns: list[RepeatLoopPattern] = []
+        used_branches: set[int] = set()
+
+        for branch in self._branches:
+            if branch.line_index in used_branches:
+                continue
+            if not branch.is_conditional or branch.is_forward is not False:
+                continue
+            if branch.target_line_index is None:
+                continue
+
+            cond = branch_condition(branch.mnemonic) or "true"
+            cond = self._rich_condition(branch.line_index, cond)
+
+            body_label = None
+            for label_name, label_index in self._label_map.items():
+                if label_index == branch.target_line_index:
+                    body_label = label_name
+                    break
+
+            patterns.append(RepeatLoopPattern(
+                body_label=body_label,
+                body_start=branch.target_line_index,
+                body_end=branch.line_index - 1,
+                condition_line=branch.line_index,
+                branch_line=branch.line_index,
+                condition=cond,
+            ))
+            used_branches.add(branch.line_index)
 
         return patterns
 
@@ -426,7 +570,9 @@ class BranchAnalyzer:
         """Extract structured control flow steps from the analyzed lines."""
         if_partterns = self.detect_if_else_patterns()
         while_patterns = self.detect_while_loops()
+        repeat_patterns = self.detect_repeat_loops()
         switch_patterns = self.detect_switch_patterns()
+        infinite_loops = self.detect_infinite_loops()
 
         # Build a map of line ranges covered by structured patterns
         covered: dict[int, str] = {}  # line_index -> pattern_id
@@ -439,9 +585,17 @@ class BranchAnalyzer:
             for i in range(pat.header_line, pat.branch_line + 1):
                 covered[i] = "while"
 
+        for pat in repeat_patterns:
+            for i in range(pat.body_start, pat.branch_line + 1):
+                covered[i] = "repeat"
+
         for pat in switch_patterns:
             for i in range(pat.compare_line, pat.end_line):
                 covered[i] = "switch"
+
+        for header, branch in infinite_loops:
+            for i in range(header, branch + 1):
+                covered[i] = "infinite"
 
         return self._build_steps(
             start=0,
@@ -449,7 +603,9 @@ class BranchAnalyzer:
             covered=covered,
             if_patterns=if_partterns,
             while_patterns=while_patterns,
+            repeat_patterns=repeat_patterns,
             switch_patterns=switch_patterns,
+            infinite_loops=infinite_loops,
         )
 
     def _build_steps(
@@ -460,7 +616,9 @@ class BranchAnalyzer:
         covered: dict[int, str],
         if_patterns: list[IfElsePattern],
         while_patterns: list[WhileLoopPattern],
+        repeat_patterns: list[RepeatLoopPattern],
         switch_patterns: list[SwitchPattern],
+        infinite_loops: list[tuple[int, int]],
     ) -> tuple[ControlFlowStep, ...]:
         steps: list[ControlFlowStep] = []
         index = start
@@ -475,29 +633,62 @@ class BranchAnalyzer:
             if coverage == "if":
                 pat = self._find_if_at(index, if_patterns)
                 if pat is not None:
-                    steps.append(self._build_if_step(pat, covered, if_patterns, while_patterns, switch_patterns))
+                    steps.append(self._build_if_step(pat, covered, if_patterns, while_patterns, repeat_patterns, switch_patterns, infinite_loops))
                     index = pat.end_line
                     continue
 
             if coverage == "while":
                 pat = self._find_while_at(index, while_patterns)
                 if pat is not None:
-                    steps.append(self._build_while_step(pat, covered, if_patterns, while_patterns, switch_patterns))
+                    steps.append(self._build_while_step(pat, covered, if_patterns, while_patterns, repeat_patterns, switch_patterns, infinite_loops))
+                    index = pat.branch_line + 1
+                    continue
+
+            if coverage == "repeat":
+                pat = self._find_repeat_at(index, repeat_patterns)
+                if pat is not None:
+                    steps.append(self._build_repeat_step(pat, covered, if_patterns, while_patterns, repeat_patterns, switch_patterns, infinite_loops))
                     index = pat.branch_line + 1
                     continue
 
             if coverage == "switch":
                 pat = self._find_switch_at(index, switch_patterns)
                 if pat is not None:
-                    steps.append(self._build_switch_step(pat, covered, if_patterns, while_patterns, switch_patterns))
+                    steps.append(self._build_switch_step(pat, covered, if_patterns, while_patterns, repeat_patterns, switch_patterns, infinite_loops))
                     index = pat.end_line
                     continue
 
-            # Uncovered line → ActionFlowStep
-            if line.is_instruction and not is_return(line.mnemonic or ""):
-                text = line.instruction_text
-                if text.strip():
-                    steps.append(ActionFlowStep(label=text))
+            if coverage == "infinite":
+                inf_match = self._find_infinite_at(index, infinite_loops)
+                if inf_match is not None:
+                    header, branch = inf_match
+                    body_steps = self._build_steps(
+                        start=header + 1,
+                        end=branch,
+                        covered=covered,
+                        if_patterns=if_patterns,
+                        while_patterns=while_patterns,
+                        repeat_patterns=repeat_patterns,
+                        switch_patterns=switch_patterns,
+                        infinite_loops=infinite_loops,
+                    )
+                    steps.append(InfiniteLoopStep())
+                    steps.extend(body_steps)
+                    index = branch + 1
+                    continue
+
+            # Uncovered line → CallFlowStep, ReturnStep, or ActionFlowStep
+            if line.is_instruction:
+                mnem = (line.mnemonic or "").lower()
+                if is_return(mnem):
+                    steps.append(ReturnStep())
+                elif mnem in ("bl", "blr"):
+                    target = line.operands.strip().split(",")[0].strip() or mnem
+                    steps.append(CallFlowStep(target=target))
+                else:
+                    text = line.instruction_text
+                    if text.strip():
+                        steps.append(ActionFlowStep(label=text))
             elif line.is_directive:
                 text = f"{line.directive} {line.operands}".strip()
                 if text.strip():
@@ -519,6 +710,21 @@ class BranchAnalyzer:
                 return pat
         return None
 
+    def _find_repeat_at(self, index: int, patterns: list[RepeatLoopPattern]) -> RepeatLoopPattern | None:
+        for pat in patterns:
+            if pat.body_start == index:
+                return pat
+        return None
+
+    @staticmethod
+    def _find_infinite_at(
+        index: int, loops: list[tuple[int, int]],
+    ) -> tuple[int, int] | None:
+        for header, branch in loops:
+            if header == index:
+                return (header, branch)
+        return None
+
     def _find_switch_at(self, index: int, patterns: list[SwitchPattern]) -> SwitchPattern | None:
         for pat in patterns:
             if pat.compare_line == index:
@@ -531,7 +737,9 @@ class BranchAnalyzer:
         covered: dict[int, str],
         if_patterns: list[IfElsePattern],
         while_patterns: list[WhileLoopPattern],
+        repeat_patterns: list[RepeatLoopPattern],
         switch_patterns: list[SwitchPattern],
+        infinite_loops: list[tuple[int, int]],
     ) -> IfFlowStep:
         then_steps = self._build_steps(
             start=pat.then_start,
@@ -539,7 +747,9 @@ class BranchAnalyzer:
             covered=covered,
             if_patterns=if_patterns,
             while_patterns=while_patterns,
+            repeat_patterns=repeat_patterns,
             switch_patterns=switch_patterns,
+            infinite_loops=infinite_loops,
         )
         else_steps: tuple[ControlFlowStep, ...] = ()
         if pat.else_start is not None and pat.else_end is not None:
@@ -549,7 +759,9 @@ class BranchAnalyzer:
                 covered=covered,
                 if_patterns=if_patterns,
                 while_patterns=while_patterns,
+                repeat_patterns=repeat_patterns,
                 switch_patterns=switch_patterns,
+                infinite_loops=infinite_loops,
             )
         return IfFlowStep(
             condition=pat.condition,
@@ -563,7 +775,9 @@ class BranchAnalyzer:
         covered: dict[int, str],
         if_patterns: list[IfElsePattern],
         while_patterns: list[WhileLoopPattern],
+        repeat_patterns: list[RepeatLoopPattern],
         switch_patterns: list[SwitchPattern],
+        infinite_loops: list[tuple[int, int]],
     ) -> WhileFlowStep:
         body_steps = self._build_steps(
             start=pat.header_line + 1,  # skip the header label to avoid re-detecting this pattern
@@ -571,9 +785,36 @@ class BranchAnalyzer:
             covered=covered,
             if_patterns=if_patterns,
             while_patterns=while_patterns,
+            repeat_patterns=repeat_patterns,
             switch_patterns=switch_patterns,
+            infinite_loops=infinite_loops,
         )
         return WhileFlowStep(
+            condition=pat.condition,
+            body_steps=body_steps,
+        )
+
+    def _build_repeat_step(
+        self,
+        pat: RepeatLoopPattern,
+        covered: dict[int, str],
+        if_patterns: list[IfElsePattern],
+        while_patterns: list[WhileLoopPattern],
+        repeat_patterns: list[RepeatLoopPattern],
+        switch_patterns: list[SwitchPattern],
+        infinite_loops: list[tuple[int, int]],
+    ) -> RepeatWhileFlowStep:
+        body_steps = self._build_steps(
+            start=pat.body_start + 1,  # skip body start label to avoid re-detecting
+            end=pat.body_end + 1,
+            covered=covered,
+            if_patterns=if_patterns,
+            while_patterns=while_patterns,
+            repeat_patterns=repeat_patterns,
+            switch_patterns=switch_patterns,
+            infinite_loops=infinite_loops,
+        )
+        return RepeatWhileFlowStep(
             condition=pat.condition,
             body_steps=body_steps,
         )
@@ -584,7 +825,9 @@ class BranchAnalyzer:
         covered: dict[int, str],
         if_patterns: list[IfElsePattern],
         while_patterns: list[WhileLoopPattern],
+        repeat_patterns: list[RepeatLoopPattern],
         switch_patterns: list[SwitchPattern],
+        infinite_loops: list[tuple[int, int]],
     ) -> SwitchFlowStep:
         cases: list[SwitchCaseFlow] = []
         for label, case_start, case_end in pat.cases:
@@ -594,7 +837,9 @@ class BranchAnalyzer:
                 covered=covered,
                 if_patterns=if_patterns,
                 while_patterns=while_patterns,
+                repeat_patterns=repeat_patterns,
                 switch_patterns=switch_patterns,
+                infinite_loops=infinite_loops,
             )
             cases.append(SwitchCaseFlow(label=label, steps=case_steps))
         return SwitchFlowStep(

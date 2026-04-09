@@ -16,6 +16,31 @@ class ActionFlowStep(ControlFlowStep):
 
 
 @dataclass(frozen=True, slots=True)
+class CallFlowStep(ControlFlowStep):
+    target: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReturnStep(ControlFlowStep):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
+class BreakStep(ControlFlowStep):
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class ContinueStep(ControlFlowStep):
+    label: str
+
+
+@dataclass(frozen=True, slots=True)
+class InfiniteLoopStep(ControlFlowStep):
+    pass
+
+
+@dataclass(frozen=True, slots=True)
 class IfFlowStep(ControlFlowStep):
     condition: str
     then_steps: tuple[ControlFlowStep, ...]

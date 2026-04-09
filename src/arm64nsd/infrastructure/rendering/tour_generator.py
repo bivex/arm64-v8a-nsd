@@ -168,6 +168,55 @@ _filter_range_done:
     ret
 """,
     },
+    {
+        "id": "call",
+        "title": "Function Calls",
+        "description": "bl and blr instructions are recognised as call steps with the target name.",
+        "source": """\
+    .global _main
+_main:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    mov x0, #42
+    bl _printf
+    mov x0, #0
+    ldp x29, x30, [sp], #16
+    ret
+""",
+    },
+    {
+        "id": "early-return",
+        "title": "Early Return / Guard Clause",
+        "description": "A ret inside a function body is shown as a visible return step — useful for guard clauses.",
+        "source": """\
+    .global _safe_div
+_safe_div:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    cbz x1, _safe_div_zero
+    sdiv x0, x0, x1
+    ldp x29, x30, [sp], #16
+    ret
+_safe_div_zero:
+    mov x0, #0
+    ldp x29, x30, [sp], #16
+    ret
+""",
+    },
+    {
+        "id": "infinite",
+        "title": "Infinite Loop",
+        "description": "A backward unconditional branch with no exit is detected as an infinite loop.",
+        "source": """\
+    .global _spin
+_spin:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+_spin_wait:
+    wfe
+    b _spin_wait
+""",
+    },
 )
 
 
@@ -742,6 +791,28 @@ _TOUR_HTML = """\
     .empty-file {{
       padding: 24px;
       color: var(--muted);
+    }}
+    /* Call / Return / Infinite / Break */
+    .ns-node.ns-call    {{ border-left: 3px solid var(--orange); background: var(--orange-dim); }}
+    .ns-node.ns-return  {{ border-left: 3px solid var(--muted); background: rgba(20, 28, 41, 0.92); }}
+    .ns-node.ns-infinite {{ border-left: 3px solid var(--red); background: var(--red-dim); }}
+    .ns-node.ns-break,
+    .ns-node.ns-continue {{ border-left: 3px solid var(--amber); background: var(--amber-dim); }}
+    .ns-infinite > .ns-header {{ background: var(--red-dim); color: var(--red); }}
+    .call-text {{
+      display: block;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.72;
+      color: var(--orange);
+    }}
+    .return-text {{
+      display: block;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.72;
+      color: var(--muted);
+      font-style: italic;
     }}
 
     @media (max-width: 900px) {{
