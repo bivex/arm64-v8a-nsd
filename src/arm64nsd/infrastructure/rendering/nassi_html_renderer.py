@@ -44,6 +44,25 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         # Temporaries (x8-x18, w8-w18) - will be default color
     }
 
+    def _escape_instruction(self, text: str) -> str:
+        """Escape HTML but preserve readable character constants.
+
+        Keeps 'z', 'A', etc. readable instead of &#x27;z&#x27;.
+        """
+        if not text:
+            return text
+
+        # Escape HTML normally
+        result = escape(text)
+
+        # Restore readable single quotes in character constants
+        # &#x27; is the HTML entity for single quote
+        result = result.replace("&#x27;", "'")
+        # Also handle the numeric variant &#39;
+        result = result.replace("&#39;", "'")
+
+        return result
+
     def _highlight_registers(self, text: str) -> str:
         """Wrap register names in spans for syntax highlighting."""
         if not text:
@@ -729,28 +748,28 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
     def _render_step(self, step: ControlFlowStep, *, depth: int) -> str:
         if isinstance(step, ActionFlowStep):
-            label_html = self._highlight_registers(escape(step.label))
+            label_html = self._highlight_registers(self._escape_instruction(step.label))
             return (
                 '<div class="ns-node ns-action">'
-                f'<div class="ns-label" aria-label="Action {escape(step.label)}">'
+                f'<div class="ns-label" aria-label="Action {self._escape_instruction(step.label)}">'
                 f'<code class="action-text">{label_html}</code>'
                 "</div>"
                 "</div>"
             )
         if isinstance(step, CallFlowStep):
-            target_html = self._highlight_registers(escape(step.target))
+            target_html = self._highlight_registers(self._escape_instruction(step.target))
             return (
                 '<div class="ns-node ns-call">'
-                f'<div class="ns-label" aria-label="Call {escape(step.target)}">'
+                f'<div class="ns-label" aria-label="Call {self._escape_instruction(step.target)}">'
                 f'<code class="call-text">call {target_html}</code>'
                 "</div>"
                 "</div>"
             )
         if isinstance(step, TailCallStep):
-            target_html = self._highlight_registers(escape(step.target))
+            target_html = self._highlight_registers(self._escape_instruction(step.target))
             return (
                 '<div class="ns-node ns-call ns-tailcall">'
-                f'<div class="ns-label" aria-label="Tail call {escape(step.target)}">'
+                f'<div class="ns-label" aria-label="Tail call {self._escape_instruction(step.target)}">'
                 f'<code class="call-text">tail call {target_html}</code>'
                 "</div>"
                 "</div>"
@@ -760,8 +779,8 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             parts = step.expression.split(maxsplit=1)
             mnemonic = parts[0] if parts else step.expression
             cond = parts[1] if len(parts) > 1 else ""
-            mnemonic_html = self._highlight_registers(escape(mnemonic))
-            cond_html = f' <span class="inline-if-cond">{self._highlight_registers(escape(cond))}</span>' if cond else ''
+            mnemonic_html = self._highlight_registers(self._escape_instruction(mnemonic))
+            cond_html = f' <span class="inline-if-cond">{self._highlight_registers(self._escape_instruction(cond))}</span>' if cond else ''
             return (
                 '<div class="ns-node ns-inline-if">'
                 '<div class="ns-label">'
@@ -771,7 +790,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 "</div>"
             )
         if isinstance(step, IndirectBranchStep):
-            reg_html = self._highlight_registers(escape(step.register))
+            reg_html = self._highlight_registers(self._escape_instruction(step.register))
             return (
                 '<div class="ns-node ns-indirect">'
                 f'<div class="ns-label" aria-label="Indirect branch">'
@@ -788,7 +807,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 "</div>"
             )
         if isinstance(step, SystemCallStep):
-            number_html = self._highlight_registers(escape(step.number))
+            number_html = self._highlight_registers(self._escape_instruction(step.number))
             return (
                 '<div class="ns-node ns-syscall">'
                 '<div class="ns-label">'
@@ -806,18 +825,18 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         if isinstance(step, BreakStep):
             return (
                 '<div class="ns-node ns-break">'
-                f'<div class="ns-label"><code class="break-text">break {escape(step.label)}</code></div>'
+                f'<div class="ns-label"><code class="break-text">break {self._escape_instruction(step.label)}</code></div>'
                 "</div>"
             )
         if isinstance(step, ContinueStep):
             return (
                 '<div class="ns-node ns-continue">'
-                f'<div class="ns-label"><code class="break-text">continue {escape(step.label)}</code></div>'
+                f'<div class="ns-label"><code class="break-text">continue {self._escape_instruction(step.label)}</code></div>'
                 "</div>"
             )
         if isinstance(step, PrologueStep):
             body = "\n".join(step.instructions)
-            body_html = self._highlight_registers(escape(body))
+            body_html = self._highlight_registers(self._escape_instruction(body))
             return (
                 '<div class="ns-node ns-prologue">'
                 '<div class="ns-label">'
@@ -828,7 +847,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             )
         if isinstance(step, EpilogueStep):
             body = "\n".join(step.instructions)
-            body_html = self._highlight_registers(escape(body))
+            body_html = self._highlight_registers(self._escape_instruction(body))
             return (
                 '<div class="ns-node ns-epilogue">'
                 '<div class="ns-label">'
@@ -922,7 +941,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         return svg_width, svg_height, content_width, text_height, split_y
 
     def _render_if_cap(self, condition: str, *, depth: int = 0) -> str:
-        escaped = escape(condition)
+        escaped = self._escape_instruction(condition)
         d = min(depth, 50)
         badge = self._depth_badge(d)
         svg_width, svg_height, content_width, text_height, split_y = self._if_cap_geometry(
@@ -980,13 +999,13 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
         return (
             f'<div class="ns-node ns-switch ns-if-depth-{d}">'
-            f'<div class="ns-switch-header">{badge} switch {escape(step.expression)}</div>'
+            f'<div class="ns-switch-header">{badge} switch {self._escape_instruction(step.expression)}</div>'
             f'<div class="ns-switch-cases">{"".join(cases_html)}</div>'
             "</div>"
         )
 
     def _render_footer(self, title: str) -> str:
-        escaped = escape(title)
+        escaped = self._escape_instruction(title)
         return f'<div class="ns-footer" aria-label="{escaped}">{escaped}</div>'
 
     def _render_case_title(self, label: str) -> str:
