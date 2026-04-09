@@ -30,6 +30,40 @@ from arm64nsd.domain.ports import NassiDiagramRenderer
 
 
 class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
+    # Register patterns for syntax highlighting
+    _REG_PATTERNS = {
+        # Argument/return registers (x0-x7, w0-w7, v0-v7, d0-d7, s0-s7)
+        "arg": re.compile(r'\b([xwvds][0-7])(?!\d)'),
+        # Callee-saved registers (x19-x28, w19-w28)
+        "callee": re.compile(r'\b([xw][12][0-9]|[xw]2[0-8])(?!\d)'),
+        # Special registers (sp, fp, lr, x29, x30, xzr, wzr)
+        "special": re.compile(r'\b(sp|wsp|fp|xfp|lr|xlr|zr|xzr|wzr|x29|w29|x30|w30)\b', re.IGNORECASE),
+        # FP/SIMD registers (v8-v31, d8-d31, s8-s31, q0-q31, h0-h31, b0-b31)
+        "fp": re.compile(r'\b([vdsqhb][89]|[1-3][0-9]|[vdsqhb][12][0-9]|[vdsqhb]3[01])(?!\d)'),
+        # Temporaries (x8-x18, w8-w18) - will be default color
+    }
+
+    def _highlight_registers(self, text: str) -> str:
+        """Wrap register names in spans for syntax highlighting."""
+        if not text:
+            return text
+
+        # Order matters: match more specific patterns first
+        replacements = [
+            (self._REG_PATTERNS["special"], "reg-special"),
+            (self._REG_PATTERNS["callee"], "reg-callee"),
+            (self._REG_PATTERNS["arg"], "reg-arg"),
+            (self._REG_PATTERNS["fp"], "reg-fp"),
+        ]
+
+        result = text
+        for pattern, css_class in replacements:
+            def replacer(m):
+                return f'<span class="{css_class}">{m.group(0)}</span>'
+            result = pattern.sub(replacer, result)
+
+        return result
+
     def _depth_badge(self, i: int) -> str:
         if i == 0:
             return ""
@@ -294,6 +328,23 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         tab-size: 2;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
+      }}
+      /* ── Register syntax highlighting ── */
+      .reg-arg {{
+        color: #7dd3fc;
+        font-weight: 500;
+      }}
+      .reg-callee {{
+        color: var(--green);
+        font-weight: 500;
+      }}
+      .reg-special {{
+        color: var(--orange);
+        font-weight: 600;
+      }}
+      .reg-fp {{
+        color: var(--purple);
+        font-weight: 500;
       }}
       /* ── Block type colours ── */
       .ns-loop,
@@ -653,26 +704,29 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
     def _render_step(self, step: ControlFlowStep, *, depth: int) -> str:
         if isinstance(step, ActionFlowStep):
+            label_html = self._highlight_registers(escape(step.label))
             return (
                 '<div class="ns-node ns-action">'
                 f'<div class="ns-label" aria-label="Action {escape(step.label)}">'
-                f'<code class="action-text">{escape(step.label)}</code>'
+                f'<code class="action-text">{label_html}</code>'
                 "</div>"
                 "</div>"
             )
         if isinstance(step, CallFlowStep):
+            target_html = self._highlight_registers(escape(step.target))
             return (
                 '<div class="ns-node ns-call">'
                 f'<div class="ns-label" aria-label="Call {escape(step.target)}">'
-                f'<code class="call-text">call {escape(step.target)}</code>'
+                f'<code class="call-text">call {target_html}</code>'
                 "</div>"
                 "</div>"
             )
         if isinstance(step, TailCallStep):
+            target_html = self._highlight_registers(escape(step.target))
             return (
                 '<div class="ns-node ns-call ns-tailcall">'
                 f'<div class="ns-label" aria-label="Tail call {escape(step.target)}">'
-                f'<code class="call-text">tail call {escape(step.target)}</code>'
+                f'<code class="call-text">tail call {target_html}</code>'
                 "</div>"
                 "</div>"
             )
@@ -681,20 +735,22 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             parts = step.expression.split(maxsplit=1)
             mnemonic = parts[0] if parts else step.expression
             cond = parts[1] if len(parts) > 1 else ""
-            cond_html = f' <span class="inline-if-cond">{escape(cond)}</span>' if cond else ''
+            mnemonic_html = self._highlight_registers(escape(mnemonic))
+            cond_html = f' <span class="inline-if-cond">{self._highlight_registers(escape(cond))}</span>' if cond else ''
             return (
                 '<div class="ns-node ns-inline-if">'
                 '<div class="ns-label">'
                 '<span class="inline-if-badge">inline if</span>'
-                f'<code class="inline-if-text"><br/>{escape(mnemonic)}{cond_html}</code>'
+                f'<code class="inline-if-text"><br/>{mnemonic_html}{cond_html}</code>'
                 "</div>"
                 "</div>"
             )
         if isinstance(step, IndirectBranchStep):
+            reg_html = self._highlight_registers(escape(step.register))
             return (
                 '<div class="ns-node ns-indirect">'
                 f'<div class="ns-label" aria-label="Indirect branch">'
-                f'<code class="call-text">jump {escape(step.register)}</code>'
+                f'<code class="call-text">jump {reg_html}</code>'
                 "</div>"
                 "</div>"
             )
@@ -726,21 +782,23 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             )
         if isinstance(step, PrologueStep):
             body = "\n".join(step.instructions)
+            body_html = self._highlight_registers(escape(body))
             return (
                 '<div class="ns-node ns-prologue">'
                 '<div class="ns-label">'
                 '<span class="stack-badge stack-badge-prologue"><span class="stack-arrow">\u2193</span>prologue</span>'
-                f'<code class="stack-text"><br/>{escape(body)}</code>'
+                f'<code class="stack-text"><br/>{body_html}</code>'
                 "</div>"
                 "</div>"
             )
         if isinstance(step, EpilogueStep):
             body = "\n".join(step.instructions)
+            body_html = self._highlight_registers(escape(body))
             return (
                 '<div class="ns-node ns-epilogue">'
                 '<div class="ns-label">'
                 '<span class="stack-badge stack-badge-epilogue"><span class="stack-arrow">\u2191</span>epilogue</span>'
-                f'<code class="stack-text"><br/>{escape(body)}</code>'
+                f'<code class="stack-text"><br/>{body_html}</code>'
                 "</div>"
                 "</div>"
             )
