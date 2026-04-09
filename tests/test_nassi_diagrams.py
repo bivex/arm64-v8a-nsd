@@ -6,6 +6,7 @@ from pathlib import Path
 
 from arm64nsd.domain.control_flow import (
     ActionFlowStep,
+    ContinueStep,
     ControlFlowDiagram,
     FunctionControlFlow,
     IfFlowStep,
@@ -327,3 +328,44 @@ class TestArm64ControlFlowExtraction:
         func = diagram.functions[0]
         has_while = any(isinstance(step, WhileFlowStep) for step in func.steps)
         assert has_while, f"Expected WhileFlowStep in {[type(s).__name__ for s in func.steps]}"
+
+    def test_continue_inside_while_loop(self) -> None:
+        extractor = _build_extractor()
+        from arm64nsd.domain.model import SourceUnit, SourceUnitId
+
+        source = SourceUnit(
+            identifier=SourceUnitId("skip_odd.s"),
+            location="skip_odd.s",
+            content=(
+                "    .text\n"
+                "    .global _skip_odd\n"
+                "_skip_odd:\n"
+                "    mov x0, #0\n"
+                "    mov x1, #0\n"
+                "_skip_odd_loop:\n"
+                "    cmp x1, #10\n"
+                "    b.ge _skip_odd_done\n"
+                "    add x1, x1, #1\n"
+                "    tbnz x1, #0, _skip_odd_body\n"
+                "    b _skip_odd_loop\n"
+                "_skip_odd_body:\n"
+                "    add x0, x0, x1\n"
+                "    b _skip_odd_loop\n"
+                "_skip_odd_done:\n"
+                "    ret\n"
+            ),
+        )
+        diagram = extractor.extract(source)
+
+        assert len(diagram.functions) >= 1
+        func = diagram.functions[0]
+        has_while = any(isinstance(step, WhileFlowStep) for step in func.steps)
+        assert has_while, f"Expected WhileFlowStep in {[type(s).__name__ for s in func.steps]}"
+
+        # The `b _skip_odd_loop` inside the body should be detected as ContinueStep
+        while_step = next(s for s in func.steps if isinstance(s, WhileFlowStep))
+        has_continue = any(isinstance(s, ContinueStep) for s in while_step.body_steps)
+        assert has_continue, (
+            f"Expected ContinueStep in while body, got: "
+            f"{[type(s).__name__ for s in while_step.body_steps]}"
+        )

@@ -14,11 +14,14 @@ from arm64nsd.domain.control_flow import (
     ControlFlowDiagram,
     ControlFlowStep,
     IfFlowStep,
+    IndirectBranchStep,
+    InlineIfStep,
     InfiniteLoopStep,
     RepeatWhileFlowStep,
     ReturnStep,
     SwitchCaseFlow,
     SwitchFlowStep,
+    TailCallStep,
     WhileFlowStep,
 )
 from arm64nsd.domain.ports import NassiDiagramRenderer
@@ -303,10 +306,15 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-node.ns-repeat  {{ border-left: 3px solid var(--blue); }}
       .ns-node.ns-switch  {{ border-left: 3px solid var(--teal); }}
       .ns-node.ns-call    {{ border-left: 3px solid var(--orange); background: var(--orange-dim); }}
+      .ns-node.ns-tailcall {{ border-left: 3px solid var(--amber); background: var(--amber-dim); }}
+      .ns-tailcall .call-text {{ color: var(--amber); }}
       .ns-node.ns-return  {{ border-left: 3px solid var(--muted); background: rgba(20, 28, 41, 0.92); }}
       .ns-node.ns-infinite {{ border-left: 3px solid var(--red); background: var(--red-dim); }}
       .ns-node.ns-break,
       .ns-node.ns-continue {{ border-left: 3px solid var(--amber); background: var(--amber-dim); }}
+      .ns-node.ns-inline-if {{ border-left: 3px solid var(--purple); background: var(--purple-dim); }}
+      .ns-node.ns-indirect {{ border-left: 3px solid var(--teal); background: var(--teal-dim); }}
+      .ns-indirect .call-text {{ color: var(--teal); }}
       .ns-infinite > .ns-header {{ background: var(--red-dim); color: var(--red); }}
       .call-text {{
         display: block;
@@ -327,6 +335,13 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         color: var(--muted);
         font-style: italic;
         letter-spacing: -0.01em;
+      }}
+      .inline-if-text {{
+        display: block;
+        font-family: var(--mono);
+        font-size: 13px;
+        line-height: 1.72;
+        color: var(--purple);
       }}
 
       /* Depth tinting */
@@ -595,6 +610,30 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 '<div class="ns-node ns-call">'
                 f'<div class="ns-label" aria-label="Call {escape(step.target)}">'
                 f'<code class="call-text">call {escape(step.target)}</code>'
+                "</div>"
+                "</div>"
+            )
+        if isinstance(step, TailCallStep):
+            return (
+                '<div class="ns-node ns-call ns-tailcall">'
+                f'<div class="ns-label" aria-label="Tail call {escape(step.target)}">'
+                f'<code class="call-text">tail call {escape(step.target)}</code>'
+                "</div>"
+                "</div>"
+            )
+        if isinstance(step, InlineIfStep):
+            return (
+                '<div class="ns-node ns-inline-if">'
+                f'<div class="ns-label" aria-label="Inline conditional">'
+                f'<code class="inline-if-text">? {escape(step.expression)}</code>'
+                "</div>"
+                "</div>"
+            )
+        if isinstance(step, IndirectBranchStep):
+            return (
+                '<div class="ns-node ns-indirect">'
+                f'<div class="ns-label" aria-label="Indirect branch">'
+                f'<code class="call-text">jump {escape(step.register)}</code>'
                 "</div>"
                 "</div>"
             )

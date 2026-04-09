@@ -11,14 +11,18 @@ from arm64nsd.domain.control_flow import (
     ContinueStep,
     ControlFlowStep,
     IfFlowStep,
+    IndirectBranchStep,
+    InlineIfStep,
     InfiniteLoopStep,
     RepeatWhileFlowStep,
     ReturnStep,
     SwitchCaseFlow,
     SwitchFlowStep,
+    TailCallStep,
     WhileFlowStep,
 )
 from arm64nsd.infrastructure.arm64.instruction_set import (
+    CONDITIONAL_SELECT_MNEMONICS,
     branch_condition,
     is_conditional_branch,
     is_return,
@@ -112,6 +116,7 @@ class BranchAnalyzer:
     # Instructions that set flags and precede conditional branches
     _FLAG_SETTING_MNEMONICS = frozenset({
         "cmp", "cmn", "tst", "ands", "bics", "adds", "subs",
+        "fcmp", "fcmpe",
     })
 
     @staticmethod
@@ -172,7 +177,7 @@ class BranchAnalyzer:
             mnem = (line.mnemonic or "").lower()
             if mnem in self._FLAG_SETTING_MNEMONICS:
                 parts = [p.strip() for p in line.operands.split(",")]
-                if mnem == "cmp" and len(parts) == 2:
+                if mnem in ("cmp", "fcmp", "fcmpe") and len(parts) == 2:
                     return self._render_condition(condition_code, parts[0], parts[1])
                 if mnem == "cmn" and len(parts) == 2:
                     return self._render_condition(condition_code, parts[0], f"-{parts[1]}")
@@ -191,6 +196,67 @@ class BranchAnalyzer:
         for label_name, label_index in self._label_map.items():
             if label_index == line_index:
                 return label_name
+        return None
+
+    def _is_tail_call(self, line: Arm64Line) -> bool:
+        """Heuristic: `b target` is a tail call if the target label is NOT
+        present in the current function body (i.e. not an internal jump)."""
+        target = self._extract_branch_target("b", line.operands)
+        if target is None:
+            return False
+        # If the label exists in our label map, it's an internal jump
+        return target not in self._label_map
+
+    def _is_loop_control(
+        self,
+        line: Arm64Line,
+        while_patterns: list[WhileLoopPattern],
+        repeat_patterns: list[RepeatLoopPattern],
+    ) -> bool:
+        """True if `b target` is a continue or break inside a known loop."""
+        kind, _ = self._loop_control_kind(line, while_patterns, repeat_patterns)
+        return kind is not None
+
+    def _loop_control_kind(
+        self,
+        line: Arm64Line,
+        while_patterns: list[WhileLoopPattern],
+        repeat_patterns: list[RepeatLoopPattern],
+    ) -> tuple[str | None, str]:
+        """Classify `b target` as ('continue', label) or ('break', label)
+        if it targets a loop header or exit.  Returns (None, '') otherwise."""
+        target = self._extract_branch_target("b", line.operands)
+        if target is None or target not in self._label_map:
+            return (None, "")
+        line_idx = None
+        for i, l in enumerate(self._lines):
+            if l is line:
+                line_idx = i
+                break
+        if line_idx is None:
+            return (None, "")
+
+        for pat in while_patterns:
+            # Continue: b targets the loop header, and we're inside the body
+            if pat.header_label == target and pat.header_line < line_idx <= pat.branch_line:
+                return ("continue", target)
+            # Break: b targets the loop exit label
+            exit_label = self._find_exit_label(pat)
+            if exit_label is not None and exit_label == target and pat.header_line < line_idx <= pat.branch_line:
+                return ("break", target)
+
+        for pat in repeat_patterns:
+            # Continue: b targets the repeat body label
+            if pat.body_label == target and pat.body_start < line_idx <= pat.branch_line:
+                return ("continue", target)
+
+        return (None, "")
+
+    def _find_exit_label(self, pat: WhileLoopPattern) -> str | None:
+        """Find the exit label of a while loop (target of the conditional exit branch)."""
+        for branch in self._branches:
+            if branch.line_index == pat.condition_line and branch.is_conditional:
+                return branch.target_label
         return None
 
     def _build_label_map(self) -> dict[str, int]:
@@ -330,8 +396,11 @@ class BranchAnalyzer:
 
         Recognises pre-condition loops: backward unconditional branch where
         the target has a forward conditional exit inside the body.
+
+        When multiple back-edges target the same header, only the one with
+        the largest branch_line (the true loop bottom) is kept.
         """
-        patterns: list[WhileLoopPattern] = []
+        candidates: dict[int, WhileLoopPattern] = {}  # header_idx → pattern
         used_branches: set[int] = set()
 
         for branch in self._branches:
@@ -352,10 +421,13 @@ class BranchAnalyzer:
                     and other.line_index < branch.line_index
                     and other.line_index not in used_branches
                 ):
+                    # Keep the pattern with the latest back-edge for this header
+                    if header_idx in candidates and candidates[header_idx].branch_line > branch.line_index:
+                        break
                     cond = branch_condition(other.mnemonic) or "true"
                     cond = self._rich_condition(other.line_index, cond)
                     header_label = self._label_at(header_idx)
-                    patterns.append(WhileLoopPattern(
+                    candidates[header_idx] = WhileLoopPattern(
                         header_label=header_label,
                         header_line=header_idx,
                         body_start=header_idx,
@@ -363,12 +435,12 @@ class BranchAnalyzer:
                         condition_line=other.line_index,
                         branch_line=branch.line_index,
                         condition=cond,
-                    ))
+                    )
                     used_branches.add(branch.line_index)
                     used_branches.add(other.line_index)
                     break
 
-        return patterns
+        return list(candidates.values())
 
     def detect_repeat_loops(self) -> list[RepeatLoopPattern]:
         """Detect repeat-until loops: backward conditional branch to body start.
@@ -677,7 +749,7 @@ class BranchAnalyzer:
                     index = branch + 1
                     continue
 
-            # Uncovered line → CallFlowStep, ReturnStep, or ActionFlowStep
+            # Uncovered line → CallFlowStep, TailCallStep, ReturnStep, or ActionFlowStep
             if line.is_instruction:
                 mnem = (line.mnemonic or "").lower()
                 if is_return(mnem):
@@ -685,6 +757,21 @@ class BranchAnalyzer:
                 elif mnem in ("bl", "blr"):
                     target = line.operands.strip().split(",")[0].strip() or mnem
                     steps.append(CallFlowStep(target=target))
+                elif mnem == "br":
+                    reg = line.operands.strip()
+                    steps.append(IndirectBranchStep(register=reg))
+                elif mnem == "b" and self._is_tail_call(line):
+                    target = line.operands.strip().split(",")[0].strip()
+                    steps.append(TailCallStep(target=target))
+                elif mnem == "b" and self._is_loop_control(line, while_patterns, repeat_patterns):
+                    target = line.operands.strip().split(",")[0].strip()
+                    kind, label = self._loop_control_kind(line, while_patterns, repeat_patterns)
+                    if kind == "continue":
+                        steps.append(ContinueStep(label=label))
+                    else:
+                        steps.append(BreakStep(label=label))
+                elif mnem in CONDITIONAL_SELECT_MNEMONICS:
+                    steps.append(InlineIfStep(expression=line.instruction_text))
                 else:
                     text = line.instruction_text
                     if text.strip():

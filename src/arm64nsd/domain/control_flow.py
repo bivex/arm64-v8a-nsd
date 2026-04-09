@@ -21,6 +21,23 @@ class CallFlowStep(ControlFlowStep):
 
 
 @dataclass(frozen=True, slots=True)
+class TailCallStep(ControlFlowStep):
+    target: str
+
+
+@dataclass(frozen=True, slots=True)
+class InlineIfStep(ControlFlowStep):
+    """Inline conditional: csel, cset, cinc, cinv, cneg, csinc, csinv, csneg."""
+    expression: str
+
+
+@dataclass(frozen=True, slots=True)
+class IndirectBranchStep(ControlFlowStep):
+    """Indirect branch via register: br xN (jump table, computed goto)."""
+    register: str
+
+
+@dataclass(frozen=True, slots=True)
 class ReturnStep(ControlFlowStep):
     pass
 

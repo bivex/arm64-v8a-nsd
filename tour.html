@@ -507,10 +507,14 @@
     }
     /* Call / Return / Infinite / Break */
     .ns-node.ns-call    { border-left: 3px solid var(--orange); background: var(--orange-dim); }
+    .ns-node.ns-tailcall { border-left: 3px solid var(--amber); background: var(--amber-dim); }
+    .ns-tailcall .call-text { color: var(--amber); }
     .ns-node.ns-return  { border-left: 3px solid var(--muted); background: rgba(20, 28, 41, 0.92); }
     .ns-node.ns-infinite { border-left: 3px solid var(--red); background: var(--red-dim); }
     .ns-node.ns-break,
     .ns-node.ns-continue { border-left: 3px solid var(--amber); background: var(--amber-dim); }
+    .ns-node.ns-inline-if { border-left: 3px solid var(--purple); background: var(--purple-dim); }
+    .ns-node.ns-indirect { border-left: 3px solid var(--teal); background: var(--teal-dim); }
     .ns-infinite > .ns-header { background: var(--red-dim); color: var(--red); }
     .call-text {
       display: block;
@@ -527,6 +531,14 @@
       color: var(--muted);
       font-style: italic;
     }
+    .inline-if-text {
+      display: block;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.72;
+      color: var(--purple);
+    }
+    .ns-indirect .call-text { color: var(--teal); }
 
     @media (max-width: 900px) {
       .section-columns {
@@ -545,7 +557,7 @@
     <p>Interactive showcase of every control-flow pattern recognised by the ARM64 NSD diagram generator — from simple sequences to nested loops.</p>
   </header>
   <nav class="tour-nav">
-    <a class="nav-link" href="#sequence"><span class="nav-num">01</span> Sequence</a><a class="nav-link" href="#if-only"><span class="nav-num">02</span> If (Conditional)</a><a class="nav-link" href="#if-else"><span class="nav-num">03</span> If / Else</a><a class="nav-link" href="#while"><span class="nav-num">04</span> While Loop</a><a class="nav-link" href="#repeat"><span class="nav-num">05</span> Repeat-While Loop</a><a class="nav-link" href="#switch"><span class="nav-num">06</span> Switch / Case</a><a class="nav-link" href="#nested"><span class="nav-num">07</span> Nested: If inside While</a><a class="nav-link" href="#call"><span class="nav-num">08</span> Function Calls</a><a class="nav-link" href="#early-return"><span class="nav-num">09</span> Early Return / Guard Clause</a><a class="nav-link" href="#infinite"><span class="nav-num">10</span> Infinite Loop</a>
+    <a class="nav-link" href="#sequence"><span class="nav-num">01</span> Sequence</a><a class="nav-link" href="#if-only"><span class="nav-num">02</span> If (Conditional)</a><a class="nav-link" href="#if-else"><span class="nav-num">03</span> If / Else</a><a class="nav-link" href="#while"><span class="nav-num">04</span> While Loop</a><a class="nav-link" href="#repeat"><span class="nav-num">05</span> Repeat-While Loop</a><a class="nav-link" href="#switch"><span class="nav-num">06</span> Switch / Case</a><a class="nav-link" href="#nested"><span class="nav-num">07</span> Nested: If inside While</a><a class="nav-link" href="#call"><span class="nav-num">08</span> Function Calls</a><a class="nav-link" href="#early-return"><span class="nav-num">09</span> Early Return / Guard Clause</a><a class="nav-link" href="#infinite"><span class="nav-num">10</span> Infinite Loop</a><a class="nav-link" href="#tailcall"><span class="nav-num">11</span> Tail Call</a><a class="nav-link" href="#cond-select"><span class="nav-num">12</span> Conditional Select (Inline If)</a><a class="nav-link" href="#indirect-branch"><span class="nav-num">13</span> Indirect Branch (Jump Table)</a>
   </nav>
   <main>
     <section class="tour-section" id="sequence"><div class="section-header"><span class="section-num">01</span><h2>Sequence</h2><p>Linear execution — instructions run one after another with no branching.</p></div><div class="section-columns"><div class="column column-source"><div class="column-title">ARM64 Source</div><pre class="source-block"><code>.global _sequence
@@ -671,7 +683,27 @@ _spin:
     mov x29, sp
 _spin_wait:
     wfe
-    b _spin_wait</code></pre></div><div class="column column-diagram"><div class="column-title">Nassi-Shneiderman Diagram</div><div class="diagram-body"><section class="function-panel"><div class="function-head"><h2 class="function-title">&lt;module&gt;</h2><div class="function-signature">&lt;module-level code&gt;</div></div><div class="function-body"><div class="ns-sequence ns-depth-0"><div class="ns-node ns-action"><div class="ns-label" aria-label="Action .global _spin"><code class="action-text">.global _spin</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action stp x29, x30, [sp, #-16]!"><code class="action-text">stp x29, x30, [sp, #-16]!</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action mov x29, sp"><code class="action-text">mov x29, sp</code></div></div><div class="ns-node ns-infinite"><div class="ns-header">Infinite Loop</div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action wfe"><code class="action-text">wfe</code></div></div></div></div></section></div></div></div></section>
+    b _spin_wait</code></pre></div><div class="column column-diagram"><div class="column-title">Nassi-Shneiderman Diagram</div><div class="diagram-body"><section class="function-panel"><div class="function-head"><h2 class="function-title">&lt;module&gt;</h2><div class="function-signature">&lt;module-level code&gt;</div></div><div class="function-body"><div class="ns-sequence ns-depth-0"><div class="ns-node ns-action"><div class="ns-label" aria-label="Action .global _spin"><code class="action-text">.global _spin</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action stp x29, x30, [sp, #-16]!"><code class="action-text">stp x29, x30, [sp, #-16]!</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action mov x29, sp"><code class="action-text">mov x29, sp</code></div></div><div class="ns-node ns-infinite"><div class="ns-header">Infinite Loop</div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action wfe"><code class="action-text">wfe</code></div></div></div></div></section></div></div></div></section><section class="tour-section" id="tailcall"><div class="section-header"><span class="section-num">11</span><h2>Tail Call</h2><p>An unconditional b to an external label is recognised as a tail call.</p></div><div class="section-columns"><div class="column column-source"><div class="column-title">ARM64 Source</div><pre class="source-block"><code>.global _wrapper
+_wrapper:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    mov x0, #42
+    ldp x29, x30, [sp], #16
+    b _inner_func</code></pre></div><div class="column column-diagram"><div class="column-title">Nassi-Shneiderman Diagram</div><div class="diagram-body"><section class="function-panel"><div class="function-head"><h2 class="function-title">&lt;module&gt;</h2><div class="function-signature">&lt;module-level code&gt;</div></div><div class="function-body"><div class="ns-sequence ns-depth-0"><div class="ns-node ns-action"><div class="ns-label" aria-label="Action .global _wrapper"><code class="action-text">.global _wrapper</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action stp x29, x30, [sp, #-16]!"><code class="action-text">stp x29, x30, [sp, #-16]!</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action mov x29, sp"><code class="action-text">mov x29, sp</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action mov x0, #42"><code class="action-text">mov x0, #42</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action ldp x29, x30, [sp], #16"><code class="action-text">ldp x29, x30, [sp], #16</code></div></div><div class="ns-node ns-call ns-tailcall"><div class="ns-label" aria-label="Tail call _inner_func"><code class="call-text">tail call _inner_func</code></div></div></div></div></section></div></div></div></section><section class="tour-section" id="cond-select"><div class="section-header"><span class="section-num">12</span><h2>Conditional Select (Inline If)</h2><p>csel, cset and friends are inline conditional moves — shown as ternary-like steps.</p></div><div class="section-columns"><div class="column column-source"><div class="column-title">ARM64 Source</div><pre class="source-block"><code>.global _clamp
+_clamp:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    cmp x0, #100
+    csel x0, x0, x0, le
+    cmp x0, #0
+    csinc x0, x0, xzr, ge
+    ldp x29, x30, [sp], #16
+    ret</code></pre></div><div class="column column-diagram"><div class="column-title">Nassi-Shneiderman Diagram</div><div class="diagram-body"><section class="function-panel"><div class="function-head"><h2 class="function-title">_clamp</h2><div class="function-signature">_clamp:</div></div><div class="function-body"><div class="ns-sequence ns-depth-0"><div class="ns-node ns-action"><div class="ns-label" aria-label="Action stp x29, x30, [sp, #-16]!"><code class="action-text">stp x29, x30, [sp, #-16]!</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action mov x29, sp"><code class="action-text">mov x29, sp</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action cmp x0, #100"><code class="action-text">cmp x0, #100</code></div></div><div class="ns-node ns-inline-if"><div class="ns-label" aria-label="Inline conditional"><code class="inline-if-text">? csel x0, x0, x0, le</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action cmp x0, #0"><code class="action-text">cmp x0, #0</code></div></div><div class="ns-node ns-inline-if"><div class="ns-label" aria-label="Inline conditional"><code class="inline-if-text">? csinc x0, x0, xzr, ge</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action ldp x29, x30, [sp], #16"><code class="action-text">ldp x29, x30, [sp], #16</code></div></div><div class="ns-node ns-return"><div class="ns-label" aria-label="Return"><code class="return-text">ret</code></div></div></div></div></section></div></div></div></section><section class="tour-section" id="indirect-branch"><div class="section-header"><span class="section-num">13</span><h2>Indirect Branch (Jump Table)</h2><p>br xN — an indirect branch via register, used for jump tables and computed gotos.</p></div><div class="section-columns"><div class="column column-source"><div class="column-title">ARM64 Source</div><pre class="source-block"><code>.global _dispatch
+_dispatch:
+    stp x29, x30, [sp, #-16]!
+    adr x1, .Ljump_table
+    ldr x2, [x1, x0, lsl #3]
+    br x2</code></pre></div><div class="column column-diagram"><div class="column-title">Nassi-Shneiderman Diagram</div><div class="diagram-body"><section class="function-panel"><div class="function-head"><h2 class="function-title">&lt;module&gt;</h2><div class="function-signature">&lt;module-level code&gt;</div></div><div class="function-body"><div class="ns-sequence ns-depth-0"><div class="ns-node ns-action"><div class="ns-label" aria-label="Action .global _dispatch"><code class="action-text">.global _dispatch</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action stp x29, x30, [sp, #-16]!"><code class="action-text">stp x29, x30, [sp, #-16]!</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action adr x1, .Ljump_table"><code class="action-text">adr x1, .Ljump_table</code></div></div><div class="ns-node ns-action"><div class="ns-label" aria-label="Action ldr x2, [x1, x0, lsl #3]"><code class="action-text">ldr x2, [x1, x0, lsl #3]</code></div></div><div class="ns-node ns-indirect"><div class="ns-label" aria-label="Indirect branch"><code class="call-text">jump x2</code></div></div></div></div></section></div></div></div></section>
   </main>
   <footer class="tour-footer">
     Generated by <a href="https://github.com">arm64nsd</a> &mdash; ARM64 v8-A Nassi-Shneiderman Diagram Generator

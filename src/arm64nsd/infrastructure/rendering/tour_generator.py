@@ -217,6 +217,50 @@ _spin_wait:
     b _spin_wait
 """,
     },
+    {
+        "id": "tailcall",
+        "title": "Tail Call",
+        "description": "An unconditional b to an external label is recognised as a tail call.",
+        "source": """\
+    .global _wrapper
+_wrapper:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    mov x0, #42
+    ldp x29, x30, [sp], #16
+    b _inner_func
+""",
+    },
+    {
+        "id": "cond-select",
+        "title": "Conditional Select (Inline If)",
+        "description": "csel, cset and friends are inline conditional moves — shown as ternary-like steps.",
+        "source": """\
+    .global _clamp
+_clamp:
+    stp x29, x30, [sp, #-16]!
+    mov x29, sp
+    cmp x0, #100
+    csel x0, x0, x0, le
+    cmp x0, #0
+    csinc x0, x0, xzr, ge
+    ldp x29, x30, [sp], #16
+    ret
+""",
+    },
+    {
+        "id": "indirect-branch",
+        "title": "Indirect Branch (Jump Table)",
+        "description": "br xN — an indirect branch via register, used for jump tables and computed gotos.",
+        "source": """\
+    .global _dispatch
+_dispatch:
+    stp x29, x30, [sp, #-16]!
+    adr x1, .Ljump_table
+    ldr x2, [x1, x0, lsl #3]
+    br x2
+""",
+    },
 )
 
 
@@ -794,10 +838,14 @@ _TOUR_HTML = """\
     }}
     /* Call / Return / Infinite / Break */
     .ns-node.ns-call    {{ border-left: 3px solid var(--orange); background: var(--orange-dim); }}
+    .ns-node.ns-tailcall {{ border-left: 3px solid var(--amber); background: var(--amber-dim); }}
+    .ns-tailcall .call-text {{ color: var(--amber); }}
     .ns-node.ns-return  {{ border-left: 3px solid var(--muted); background: rgba(20, 28, 41, 0.92); }}
     .ns-node.ns-infinite {{ border-left: 3px solid var(--red); background: var(--red-dim); }}
     .ns-node.ns-break,
     .ns-node.ns-continue {{ border-left: 3px solid var(--amber); background: var(--amber-dim); }}
+    .ns-node.ns-inline-if {{ border-left: 3px solid var(--purple); background: var(--purple-dim); }}
+    .ns-node.ns-indirect {{ border-left: 3px solid var(--teal); background: var(--teal-dim); }}
     .ns-infinite > .ns-header {{ background: var(--red-dim); color: var(--red); }}
     .call-text {{
       display: block;
@@ -814,6 +862,14 @@ _TOUR_HTML = """\
       color: var(--muted);
       font-style: italic;
     }}
+    .inline-if-text {{
+      display: block;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.72;
+      color: var(--purple);
+    }}
+    .ns-indirect .call-text {{ color: var(--teal); }}
 
     @media (max-width: 900px) {{
       .section-columns {{
