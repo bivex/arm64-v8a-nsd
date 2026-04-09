@@ -706,7 +706,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 '<div class="ns-node ns-prologue">'
                 '<div class="ns-label">'
                 '<span class="stack-badge stack-badge-prologue"><span class="stack-arrow">\u2193</span>prologue</span>'
-                f'<code class="stack-text">{escape(body)}</code>'
+                f'<code class="stack-text"><br/>{escape(body)}</code>'
                 "</div>"
                 "</div>"
             )
@@ -716,7 +716,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 '<div class="ns-node ns-epilogue">'
                 '<div class="ns-label">'
                 '<span class="stack-badge stack-badge-epilogue"><span class="stack-arrow">\u2191</span>epilogue</span>'
-                f'<code class="stack-text">{escape(body)}</code>'
+                f'<code class="stack-text"><br/>{escape(body)}</code>'
                 "</div>"
                 "</div>"
             )
